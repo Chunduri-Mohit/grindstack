@@ -13,6 +13,8 @@ interface AuthContextType {
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  isFirebaseConfigured: boolean;
+  loginAsGuest: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -21,6 +23,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<UserProfile>(() => localDb.getProfile());
+
+  const isFirebaseConfigured = !!import.meta.env.VITE_FIREBASE_API_KEY;
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -63,14 +67,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const loginAsGuest = () => {
+    const guestUser = {
+      uid: "guest_user",
+      displayName: "Guest Grinder",
+      email: "guest@grindstack.com",
+    } as User;
+    setUser(guestUser);
+    setProfile(localDb.getProfile());
+  };
+
   const logout = async () => {
     try {
-      await signOut(auth);
+      if (isFirebaseConfigured) {
+        await signOut(auth);
+      }
       localDb.clearAllData();
+      setUser(null);
       setProfile(localDb.getProfile());
     } catch (error) {
       console.error("Logout Error:", error);
-      throw error;
+      setUser(null);
+      setProfile(localDb.getProfile());
     }
   };
 
@@ -80,7 +98,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, profile, setProfile, loginWithGoogle, logout, refreshProfile }}>
+    <AuthContext.Provider value={{ user, loading, profile, setProfile, loginWithGoogle, logout, refreshProfile, isFirebaseConfigured, loginAsGuest }}>
       {children}
     </AuthContext.Provider>
   );
