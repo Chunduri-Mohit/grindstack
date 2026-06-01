@@ -6,15 +6,15 @@ export const LoginScreen: React.FC = () => {
   const { loginWithGoogle, isFirebaseConfigured, loginAsGuest } = useAuth();
 
   return (
-    <div className="screen-content" style={{ justifyContent: "center", minHeight: "80vh", padding: "40px 20px" }}>
-      <div style={{ textAlign: "center", marginBottom: "40px" }}>
+    <div className="screen-content" style={{ padding: "24px 20px" }}>
+      <div style={{ textAlign: "center", marginBottom: "24px" }}>
         <h1 className="login-logo">GRINDSTACK</h1>
-        <p className="text-md" style={{ color: "var(--text-secondary)", marginTop: "8px" }}>
+        <p className="text-md" style={{ color: "var(--text-secondary)", marginTop: "6px" }}>
           Reclaim your focus. Track, study, recover, and grow.
         </p>
       </div>
 
-      <div className="flex-column" style={{ gap: "16px", marginBottom: "40px" }}>
+      <div className="flex-column" style={{ gap: "12px", marginBottom: "24px" }}>
         <GlassCard>
           <div style={{ display: "flex", gap: "14px", alignItems: "flex-start" }}>
             <span style={{ fontSize: "24px" }}>🎯</span>
