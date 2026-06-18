@@ -49,8 +49,8 @@ export const LoginScreen: React.FC = () => {
       <div className="flex-column" style={{ gap: "12px", width: "100%" }}>
         {isFirebaseConfigured ? (
           <>
-            <button 
-              className="btn btn-accent" 
+            <button
+              className="btn btn-accent"
               onClick={loginWithGoogle}
               style={{ width: "100%", padding: "16px", fontSize: "16px", borderRadius: "12px", gap: "12px" }}
             >
@@ -62,8 +62,8 @@ export const LoginScreen: React.FC = () => {
               </svg>
               Continue with Google
             </button>
-            <button 
-              className="btn btn-secondary" 
+            <button
+              className="btn btn-secondary"
               onClick={loginAsGuest}
               style={{ width: "100%", padding: "14px", fontSize: "14px", borderRadius: "12px" }}
             >
@@ -72,11 +72,11 @@ export const LoginScreen: React.FC = () => {
           </>
         ) : (
           <>
-            <div className="flex-column" style={{ 
-              padding: "16px", 
-              background: "rgba(251, 146, 60, 0.08)", 
-              border: "1px solid rgba(251, 146, 60, 0.2)", 
-              borderRadius: "12px", 
+            <div className="flex-column" style={{
+              padding: "16px",
+              background: "rgba(173, 198, 255, 0.08)",
+              border: "1px solid rgba(173, 198, 255, 0.2)",
+              borderRadius: "12px",
               marginBottom: "8px",
               textAlign: "left",
               gap: "6px"
@@ -86,8 +86,8 @@ export const LoginScreen: React.FC = () => {
                 Add your Firebase environment variables in Vercel to enable Cloud features.
               </p>
             </div>
-            <button 
-              className="btn btn-accent" 
+            <button
+              className="btn btn-accent"
               onClick={loginAsGuest}
               style={{ width: "100%", padding: "16px", fontSize: "16px", borderRadius: "12px" }}
             >

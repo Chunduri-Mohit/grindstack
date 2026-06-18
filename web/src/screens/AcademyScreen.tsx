@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { localDb } from "../db/localDb";
 import type { TechLog } from "../db/localDb";
-import { GlassCard } from "../components/GlassCard";
+import { TimeInput } from "../components/TimeInput";
 
 const SUBJECTS = ["Problem Solving", "Web Dev", "Python", "Java", "CRT", "Striver's DSA Sheet"];
 const PLATFORMS = ["LeetCode", "CodeChef", "Smart Interviews", "Striver's Sheet"];
@@ -46,9 +46,13 @@ function resolveSubject(topic: string, platform: string): string {
 export const AcademyScreen: React.FC = () => {
   const { refreshProfile } = useAuth();
   const [techLogs, setTechLogs] = useState<TechLog[]>([]);
-  const [selectedSubject, setSelectedSubject] = useState(SUBJECTS[0]);
-  const [selectedPlatform, setSelectedPlatform] = useState(PLATFORMS[0]);
-  const [countInput, setCountInput] = useState("");
+  const [selectedSubject, setSelectedSubject] = useState("Problem Solving");
+  const [selectedPlatform, setSelectedPlatform] = useState("LeetCode");
+
+  // Custom Slider and Calibration States
+  const [solvedCount, setSolvedCount] = useState(3); // default 3 problems
+  const [startTime, setStartTime] = useState("05:30");
+  const [endTime, setEndTime] = useState("07:00");
 
   useEffect(() => {
     setTechLogs(localDb.getTechLogs());
@@ -56,11 +60,10 @@ export const AcademyScreen: React.FC = () => {
 
   const handleLogSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const count = parseInt(countInput) || 1;
-    const newLog = localDb.addTechLog(selectedSubject, selectedPlatform, count);
+    const newLog = localDb.addTechLog(selectedSubject, selectedPlatform, solvedCount);
     setTechLogs([newLog, ...techLogs]);
-    setCountInput("");
     await refreshProfile();
+    alert(`Logged ${solvedCount} problems in ${selectedSubject}! +${solvedCount * 15} XP added.`);
   };
 
   // Calculate subject progress maps
@@ -74,133 +77,223 @@ export const AcademyScreen: React.FC = () => {
     return { count: totalCount, percentage, target };
   };
 
+  const getIntensityLabel = (val: number) => {
+    if (val <= 2) return "Routine";
+    if (val <= 5) return "Moderate";
+    if (val <= 8) return "High";
+    return "Absolute";
+  };
+
   return (
-    <div className="screen-content">
-      {/* Title */}
-      <div>
-        <h2 className="bold" style={{ fontSize: "22px" }}>ACADEMY & CODING</h2>
-        <p className="text-sm" style={{ color: "var(--text-secondary)", marginTop: "4px" }}>
-          Log problems or topics study sessions. Earn 15 XP each.
+    <div className="space-y-stack-lg w-full pb-20">
+      {/* Header Section */}
+      <section className="flex flex-col gap-stack-sm">
+        <h2 className="font-section text-section text-on-surface">Mission Architect</h2>
+        <p className="font-body text-body text-on-surface-variant">
+          Design your protocol. Precision yields progress. Log problems solved to earn 15 XP each.
         </p>
-      </div>
+      </section>
 
-      {/* Subject Progression */}
-      <GlassCard className="flex-column" style={{ gap: "14px" }}>
-        <h3 className="semibold text-sm" style={{ textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--text-secondary)" }}>
-          Subject Progression
-        </h3>
-        
-        <div className="flex-column" style={{ gap: "12px" }}>
-          {SUBJECTS.map(subj => {
-            const { count, percentage, target } = getSubjectProgress(subj);
-            return (
-              <div key={subj}>
-                <div className="flex-row-between" style={{ marginBottom: "6px" }}>
-                  <span className="text-sm semibold" style={{ color: "var(--text-primary)" }}>{subj}</span>
-                  <span className="text-xs" style={{ color: "var(--text-secondary)" }}>{count} / {target}</span>
-                </div>
-                <div style={{
-                  width: "100%",
-                  height: "6px",
-                  background: "rgba(255,255,255,0.05)",
-                  borderRadius: "8px",
-                  overflow: "hidden"
-                }}>
-                  <div style={{
-                    width: `${percentage}%`,
-                    height: "100%",
-                    background: "var(--text-primary)",
-                    borderRadius: "8px",
-                    transition: "width 0.3s ease-in-out"
-                  }} />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </GlassCard>
-
-      {/* Manual log form */}
-      <GlassCard>
-        <h3 className="semibold text-sm" style={{ textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--text-secondary)", marginBottom: "16px" }}>
-          LOG NEW CODING ATTACK
-        </h3>
-        <form onSubmit={handleLogSubmit} className="flex-column">
-          <div className="input-group">
-            <span className="input-label">Subject / Topic</span>
-            <select 
-              value={selectedSubject} 
-              onChange={e => setSelectedSubject(e.target.value)}
-              className="text-input"
-              style={{ background: "rgba(17,16,8,0.9)", color: "var(--text-primary)" }}
-            >
-              {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-
-          <div className="input-group">
-            <span className="input-label">Platform</span>
-            <select 
-              value={selectedPlatform} 
-              onChange={e => setSelectedPlatform(e.target.value)}
-              className="text-input"
-              style={{ background: "rgba(17,16,8,0.9)", color: "var(--text-primary)" }}
-            >
-              {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
-            </select>
-          </div>
-
-          <div className="input-group">
-            <span className="input-label">Solved count (modules / questions)</span>
-            <input 
-              type="number" 
-              placeholder="e.g. 3" 
-              value={countInput}
-              onChange={e => setCountInput(e.target.value)}
-              className="text-input"
-              min="1"
-              required
-            />
-          </div>
-
-          <button 
-            type="submit" 
-            className="btn btn-primary" 
-            style={{ width: "100%", marginTop: "8px" }}
+      {/* Bento Subject Selection */}
+      <section className="flex flex-col gap-stack-md">
+        <h3 className="font-label-caps text-label-caps text-outline uppercase tracking-wider">Select Directive</h3>
+        <div className="grid grid-cols-2 gap-gutter">
+          {/* Card 1: Problem Solving */}
+          <div
+            onClick={() => setSelectedSubject("Problem Solving")}
+            className={`glass-panel rounded-xl p-[16px] flex flex-col gap-stack-sm cursor-pointer transition-all duration-300 hover:scale-[1.02] ${
+              selectedSubject === "Problem Solving" ? "glass-panel-active" : ""
+            }`}
           >
-            LOG WORK & EARN +15 XP
-          </button>
-        </form>
-      </GlassCard>
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-1 ${
+              selectedSubject === "Problem Solving" ? "bg-primary/20 text-primary" : "bg-surface-variant text-on-surface-variant"
+            }`}>
+              <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>psychology</span>
+            </div>
+            <h4 className="font-card-title text-sm text-on-surface font-semibold">Deep Work</h4>
+            <p className="font-label-caps text-[10px] text-on-surface-variant">Problem Solving</p>
+          </div>
 
-      {/* Log History list */}
-      <div>
-        <h3 className="semibold text-sm" style={{ textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--text-secondary)", marginBottom: "12px" }}>
-          LOG HISTORY
-        </h3>
+          {/* Card 2: Striver's DSA Sheet */}
+          <div
+            onClick={() => setSelectedSubject("Striver's DSA Sheet")}
+            className={`glass-panel rounded-xl p-[16px] flex flex-col gap-stack-sm cursor-pointer transition-all duration-300 hover:scale-[1.02] ${
+              selectedSubject === "Striver's DSA Sheet" ? "glass-panel-active" : ""
+            }`}
+          >
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-1 ${
+              selectedSubject === "Striver's DSA Sheet" ? "bg-primary/20 text-primary" : "bg-surface-variant text-on-surface-variant"
+            }`}>
+              <span className="material-symbols-outlined">menu_book</span>
+            </div>
+            <h4 className="font-card-title text-sm text-on-surface font-semibold">Striver's DSA</h4>
+            <p className="font-label-caps text-[10px] text-on-surface-variant">Standard Grid Sheet</p>
+          </div>
+
+          {/* Card 3: Web Dev */}
+          <div
+            onClick={() => setSelectedSubject("Web Dev")}
+            className={`glass-panel rounded-xl p-[16px] flex flex-col gap-stack-sm cursor-pointer transition-all duration-300 hover:scale-[1.02] col-span-2 ${
+              selectedSubject === "Web Dev" ? "glass-panel-active" : ""
+            }`}
+          >
+            <div className="flex items-center gap-gutter">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                selectedSubject === "Web Dev" ? "bg-primary/20 text-primary" : "bg-surface-variant text-on-surface-variant"
+              }`}>
+                <span className="material-symbols-outlined">code</span>
+              </div>
+              <div>
+                <h4 className="font-card-title text-sm text-on-surface font-semibold">Web Development</h4>
+                <p className="font-label-caps text-[10px] text-on-surface-variant">Read, Learn, Synthesize</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Small dropdown selection fallback for remaining subjects */}
+        <div className="flex gap-2 items-center bg-surface-container/30 border border-white/5 p-2 rounded-xl">
+          <span className="text-xs text-on-surface-variant font-label-caps px-2">Other Directive:</span>
+          <select
+            value={SUBJECTS.includes(selectedSubject) ? selectedSubject : "Problem Solving"}
+            onChange={e => setSelectedSubject(e.target.value)}
+            className="flex-1 bg-transparent text-sm text-on-surface outline-none border-none cursor-pointer"
+          >
+            {SUBJECTS.map(s => <option key={s} value={s} className="bg-background">{s}</option>)}
+          </select>
+        </div>
+      </section>
+
+      {/* Platform Pill Selector */}
+      <section className="flex flex-col gap-stack-sm">
+        <h3 className="font-label-caps text-label-caps text-outline uppercase tracking-wider">Target Platform</h3>
+        <div className="flex flex-wrap gap-2">
+          {PLATFORMS.map(p => (
+            <button
+              key={p}
+              onClick={() => setSelectedPlatform(p)}
+              className={`px-4 py-2 rounded-full font-label-caps text-xs border transition-all ${
+                selectedPlatform === p
+                  ? "bg-primary/10 text-primary border-primary/30"
+                  : "bg-surface-container-low/40 text-on-surface-variant border-white/5 hover:bg-white/5"
+              }`}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {/* Calibration Form Card */}
+      <form onSubmit={handleLogSubmit} className="space-y-6">
+        <section className="flex flex-col gap-stack-md glass-panel rounded-xl p-[20px]">
+          <h3 className="font-label-caps text-label-caps text-outline uppercase tracking-wider mb-2">Calibration</h3>
+
+          {/* Solved Count Slider (Mapped as Intensity) */}
+          <div className="flex flex-col gap-stack-sm mb-4">
+            <div className="flex justify-between items-center">
+              <span className="font-body text-sm text-on-surface">Target Solved Count</span>
+              <span className="font-card-title text-card-title text-primary font-semibold">
+                {solvedCount} {solvedCount === 1 ? "Problem" : "Problems"} ({getIntensityLabel(solvedCount)})
+              </span>
+            </div>
+
+            <input
+              type="range"
+              min="1"
+              max="10"
+              value={solvedCount}
+              onChange={e => setSolvedCount(Number(e.target.value))}
+              className="w-full appearance-none bg-white/10 h-1 rounded-lg outline-none cursor-pointer accent-primary"
+            />
+            <div className="flex justify-between text-[10px] font-label-caps text-on-surface-variant opacity-60 mt-1">
+              <span>Routine (1)</span>
+              <span>Absolute (10)</span>
+            </div>
+          </div>
+
+          {/* Time Allocation */}
+          <div className="flex flex-col gap-stack-sm">
+            <span className="font-body text-sm text-on-surface">Time Allocation</span>
+            <div className="flex gap-gutter">
+              <TimeInput
+                label="START"
+                value={startTime}
+                onChange={setStartTime}
+                variant="compact"
+              />
+              <TimeInput
+                label="END"
+                value={endTime}
+                onChange={setEndTime}
+                variant="compact"
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* Projected Impact */}
+        <section className="flex flex-col gap-stack-md glass-panel rounded-xl p-[20px]">
+          <div className="flex justify-between items-center mb-2">
+            <h3 className="font-label-caps text-label-caps text-outline uppercase tracking-wider">Projected Impact</h3>
+            <span className="font-label-caps text-label-caps text-tertiary-container">+{solvedCount * 15} XP</span>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <div className="flex justify-between items-center">
+              <span className="font-body text-sm text-on-surface-variant">Subject Progression</span>
+              <span className="font-body text-sm text-on-surface">
+                {getSubjectProgress(selectedSubject).count} → <span className="text-primary font-section text-lg ml-1">{getSubjectProgress(selectedSubject).count + solvedCount}</span>
+              </span>
+            </div>
+
+            {/* Progress Track */}
+            <div className="h-1 bg-primary/10 rounded-full overflow-hidden w-full relative mt-2">
+              <div
+                className="absolute top-0 left-0 h-full bg-primary transition-all duration-300"
+                style={{ width: `${Math.min(100, ((getSubjectProgress(selectedSubject).count + solvedCount) / (SUBJECT_TARGETS[selectedSubject] || 40)) * 100)}%` }}
+              ></div>
+            </div>
+          </div>
+        </section>
+
+        {/* Commit Button */}
+        <button
+          type="submit"
+          className="w-full bg-primary text-on-primary font-section py-4 rounded-full relative overflow-hidden transition-transform duration-300 hover:scale-[1.02] shadow-[0_0_24px_rgba(208,188,255,0.2)] text-sm"
+        >
+          <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent pointer-events-none"></div>
+          Commit Mission
+        </button>
+      </form>
+
+      {/* Log History */}
+      <section className="space-y-4">
+        <h3 className="font-label-caps text-label-caps text-outline uppercase tracking-wider px-1">Log History</h3>
+
         {techLogs.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "20px", color: "var(--text-muted)", fontSize: "13px" }}>
+          <div className="glass-panel rounded-xl p-8 text-center text-xs text-on-surface-variant/40">
             No technical study logs recorded yet.
           </div>
         ) : (
-          <div className="flex-column" style={{ gap: "10px" }}>
+          <div className="space-y-2">
             {techLogs.map(log => (
-              <GlassCard key={log.id} style={{ padding: "12px 16px" }} className="flex-row-between">
-                <div style={{ textAlign: "left" }}>
-                  <h4 className="semibold text-sm" style={{ color: "var(--text-primary)" }}>{log.topic}</h4>
-                  <p className="text-xs" style={{ color: "var(--text-secondary)", marginTop: "2px" }}>
-                    {log.platform} • {log.count} solved
+              <div key={log.id} className="glass-panel rounded-xl p-4 flex justify-between items-center">
+                <div>
+                  <h4 className="font-body text-sm text-on-surface font-semibold">{log.topic}</h4>
+                  <p className="text-xs text-on-surface-variant mt-1">
+                    {log.platform} • {log.count} problems solved
                   </p>
                 </div>
-                <div style={{ textAlign: "right" }}>
-                  <span className="orange-accent semibold text-sm">+{log.xpEarned} XP</span>
-                  <p className="text-xs" style={{ color: "var(--text-muted)", marginTop: "2px" }}>{log.dateString}</p>
+                <div className="text-right">
+                  <span className="text-primary font-semibold text-sm">+{log.xpEarned} XP</span>
+                  <p className="text-[10px] text-on-surface-variant mt-1">{log.dateString}</p>
                 </div>
-              </GlassCard>
+              </div>
             ))}
           </div>
         )}
-      </div>
+      </section>
     </div>
   );
 };

@@ -519,9 +519,43 @@ export const localDb = {
     return trimmed;
   },
 
+  async resolveSquadId(input: string): Promise<{ id: string; name: string | null }> {
+    const cleanGroupId = this.extractSquadId(input);
+
+    try {
+      const directSnap = await getDoc(doc(db, "squads", cleanGroupId));
+      if (directSnap.exists()) {
+        return {
+          id: cleanGroupId,
+          name: directSnap.data().name || null
+        };
+      }
+
+      const lowerInput = input.trim().toLowerCase();
+      const squadsSnap = await getDocs(collection(db, "squads"));
+      const matchingSquad = squadsSnap.docs.find(squadDoc => {
+        const data = squadDoc.data();
+        const squadName = String(data.name || "").trim().toLowerCase();
+        return squadDoc.id.toLowerCase() === lowerInput || squadName === lowerInput;
+      });
+
+      if (matchingSquad) {
+        return {
+          id: matchingSquad.id,
+          name: matchingSquad.data().name || null
+        };
+      }
+    } catch (e) {
+      console.error("Firestore resolve squad failed", e);
+    }
+
+    return { id: cleanGroupId, name: null };
+  },
+
   async joinSquad(squadIdInput: string, squadNameInput: string): Promise<UserProfile> {
-    const cleanGroupId = this.extractSquadId(squadIdInput);
-    let finalGroupName = squadNameInput.trim();
+    const resolvedSquad = await this.resolveSquadId(squadIdInput);
+    const cleanGroupId = resolvedSquad.id;
+    let finalGroupName = squadNameInput.trim() || resolvedSquad.name || "";
 
     if (!finalGroupName || finalGroupName === cleanGroupId) {
       try {
@@ -619,7 +653,7 @@ export const localDb = {
     const tasks = this.getTasks();
     const newTask: Task = {
       id: Math.random().toString(36).substr(2, 9),
-      name,
+      name: name.trim(),
       category,
       isCompleted: false,
       isCustom: true,
@@ -637,17 +671,54 @@ export const localDb = {
     return tasks;
   },
 
-  deleteCustomTask(taskId: string): Task[] {
-    let tasks = this.getTasks();
-    tasks = tasks.filter(t => t.id !== taskId || !t.isCustom);
+  updateTask(taskId: string, name: string, category: string): Task[] {
+    const trimmedName = name.trim();
+    if (!trimmedName) return this.getTasks();
+
+    const tasks = this.getTasks().map(task =>
+      task.id === taskId
+        ? { ...task, name: trimmedName, category }
+        : task
+    );
     this.saveTasks(tasks);
 
-    // Sync with leaderboard if logged in
     if (auth.currentUser) {
       const profile = this.getProfile();
       this.syncLocalToLeaderboard(profile, tasks);
     }
     return tasks;
+  },
+
+  deleteTask(taskId: string): Task[] {
+    const tasks = this.getTasks().filter(t => t.id !== taskId);
+    this.saveTasks(tasks);
+
+    if (auth.currentUser) {
+      const profile = this.getProfile();
+      this.syncLocalToLeaderboard(profile, tasks);
+    }
+    return tasks;
+  },
+
+  reorderTasks(taskIds: string[]): Task[] {
+    const tasks = this.getTasks();
+    const taskById = new Map(tasks.map(task => [task.id, task]));
+    const orderedTasks = taskIds
+      .map(id => taskById.get(id))
+      .filter((task): task is Task => Boolean(task));
+    const remainingTasks = tasks.filter(task => !taskIds.includes(task.id));
+    const nextTasks = [...orderedTasks, ...remainingTasks];
+    this.saveTasks(nextTasks);
+
+    if (auth.currentUser) {
+      const profile = this.getProfile();
+      this.syncLocalToLeaderboard(profile, nextTasks);
+    }
+    return nextTasks;
+  },
+
+  deleteCustomTask(taskId: string): Task[] {
+    return this.deleteTask(taskId);
   },
 
   clearAllData() {
@@ -658,4 +729,3 @@ export const localDb = {
     localStorage.removeItem(KEYS.LEADERBOARD);
   }
 };
-
