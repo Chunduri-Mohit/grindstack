@@ -35,6 +35,8 @@ export interface DailyHabits {
   sleepCompleted: boolean;
   bedtime: string;
   wakeTime: string;
+  screenTimeGoalToggled: boolean;
+  limitedEntToggled: boolean;
 }
 
 export interface TechLog {
@@ -91,7 +93,23 @@ export const localDb = {
   getProfile(): UserProfile {
     const data = localStorage.getItem(KEYS.PROFILE);
     if (data) {
-      return JSON.parse(data);
+      const parsed = JSON.parse(data) as Partial<UserProfile>;
+      const normalized: UserProfile = {
+        username: parsed.username || "Grinder",
+        profilePic: parsed.profilePic || "avatar_1",
+        xp: parsed.xp ?? 20,
+        longestStreak: parsed.longestStreak ?? 0,
+        currentGroupId: parsed.currentGroupId ?? null,
+        currentGroupName: parsed.currentGroupName ?? null,
+        totalTasksCompletedAllTime: parsed.totalTasksCompletedAllTime ?? 0,
+        badgeCount: parsed.badgeCount ?? 0,
+        lastResetDateString: parsed.lastResetDateString || getTodayDateString(),
+        routineStreak: parsed.routineStreak ?? 0,
+        graceDaysAllowedThisWeek: 1,
+        graceDaysUsedThisWeek: parsed.graceDaysUsedThisWeek ?? 0
+      };
+      this.saveProfile(normalized);
+      return normalized;
     }
     const today = getTodayDateString();
     const newProfile: UserProfile = {
@@ -105,7 +123,7 @@ export const localDb = {
       badgeCount: 0,
       lastResetDateString: today,
       routineStreak: 0,
-      graceDaysAllowedThisWeek: 2,
+      graceDaysAllowedThisWeek: 1,
       graceDaysUsedThisWeek: 0
     };
     this.saveProfile(newProfile);
@@ -140,7 +158,13 @@ export const localDb = {
     const today = getTodayDateString();
     const all = this.getAllHabits();
     const existing = all.find(h => h.dateString === today);
-    if (existing) return existing;
+    if (existing) {
+      const normalized = this.normalizeHabit(existing);
+      if (JSON.stringify(normalized) !== JSON.stringify(existing)) {
+        this.saveHabit(normalized);
+      }
+      return normalized;
+    }
 
     const newHabit: DailyHabits = {
       dateString: today,
@@ -149,21 +173,38 @@ export const localDb = {
       skincareCompleted: false,
       sleepCompleted: false,
       bedtime: "22:30",
-      wakeTime: "06:30"
+      wakeTime: "06:30",
+      screenTimeGoalToggled: false,
+      limitedEntToggled: false
     };
     this.saveHabit(newHabit);
     return newHabit;
   },
 
   saveHabit(habit: DailyHabits) {
+    const normalizedHabit = this.normalizeHabit(habit);
     const all = this.getAllHabits();
-    const idx = all.findIndex(h => h.dateString === habit.dateString);
+    const idx = all.findIndex(h => h.dateString === normalizedHabit.dateString);
     if (idx >= 0) {
-      all[idx] = habit;
+      all[idx] = normalizedHabit;
     } else {
-      all.push(habit);
+      all.push(normalizedHabit);
     }
     localStorage.setItem(KEYS.HABITS, JSON.stringify(all));
+  },
+
+  normalizeHabit(habit: DailyHabits): DailyHabits {
+    return {
+      dateString: habit.dateString,
+      gymCompleted: habit.gymCompleted ?? false,
+      dietCompleted: habit.dietCompleted ?? false,
+      skincareCompleted: habit.skincareCompleted ?? false,
+      sleepCompleted: habit.sleepCompleted ?? false,
+      bedtime: habit.bedtime || "22:30",
+      wakeTime: habit.wakeTime || "06:30",
+      screenTimeGoalToggled: habit.screenTimeGoalToggled ?? false,
+      limitedEntToggled: habit.limitedEntToggled ?? false
+    };
   },
 
   prepopulateMockHistory() {
@@ -188,7 +229,9 @@ export const localDb = {
         skincareCompleted: Math.random() > 0.2,
         sleepCompleted: Math.random() > 0.5,
         bedtime: "22:30",
-        wakeTime: "06:30"
+        wakeTime: "06:30",
+        screenTimeGoalToggled: false,
+        limitedEntToggled: false
       });
     }
     localStorage.setItem(KEYS.HABITS, JSON.stringify(all));
@@ -202,16 +245,17 @@ export const localDb = {
 
   addTechLog(topic: string, platform: string, count: number): TechLog {
     const logs = this.getTechLogs();
-    const xpEarned = 15;
+    const loggedCount = Math.max(1, count);
+    const xpEarned = loggedCount * 15;
     const newLog: TechLog = {
       id: Math.random().toString(36).substr(2, 9),
       topic,
       platform,
-      count,
+      count: loggedCount,
       dateString: getTodayDateString(),
       xpEarned
     };
-    logs.push(newLog);
+    logs.unshift(newLog);
     localStorage.setItem(KEYS.TECH_LOGS, JSON.stringify(logs));
 
     // Award XP
@@ -239,16 +283,21 @@ export const localDb = {
 
     if (profile.lastResetDateString !== today) {
       const currentTasks = this.getTasks();
-      let allowedGrace = profile.graceDaysAllowedThisWeek;
-      let graceUsedNow = profile.graceDaysUsedThisWeek;
+      const allowedGrace = profile.graceDaysAllowedThisWeek;
+      const graceUsedAtStart = profile.graceDaysUsedThisWeek;
 
-      // Handle weekly grace reset on Monday
       const lastResetDate = new Date(profile.lastResetDateString);
       const todayDate = new Date(today);
       const isNewWeek = lastResetDate.getDay() > todayDate.getDay() || (todayDate.getTime() - lastResetDate.getTime()) > 7 * 86400000;
       if (isNewWeek) {
-        graceUsedNow = 0;
+        profile.graceDaysUsedThisWeek = 0;
       }
+
+      const missedAnyTask = currentTasks.some(t => !t.isCompleted);
+      const graceUsedBeforeReset = isNewWeek ? 0 : graceUsedAtStart;
+      const usesGraceDay = missedAnyTask && graceUsedBeforeReset < allowedGrace;
+      const graceUsedNow = graceUsedBeforeReset + (usesGraceDay ? 1 : 0);
+      const wasPerfectDay = currentTasks.length > 0 && currentTasks.every(t => t.isCompleted);
 
       const updatedTasks = currentTasks.map(t => {
         if (t.isCompleted) {
@@ -259,8 +308,7 @@ export const localDb = {
             lastCompletedDate: profile.lastResetDateString
           };
         } else {
-          if (allowedGrace > graceUsedNow) {
-            graceUsedNow += 1;
+          if (usesGraceDay) {
             return {
               ...t,
               isCompleted: false,
@@ -281,14 +329,14 @@ export const localDb = {
       // Ensure daily habits exist for today
       this.getHabitsForToday();
 
-      // Check routine streak: if all standard tasks were completed
-      const allCompletedBeforeReset = currentTasks.filter(t => !t.isCustom).every(t => t.isCompleted);
+      const longestTaskStreak = Math.max(0, ...updatedTasks.map(t => t.streak));
 
       const newProfile: UserProfile = {
         ...profile,
         lastResetDateString: today,
         graceDaysUsedThisWeek: graceUsedNow,
-        routineStreak: allCompletedBeforeReset ? profile.routineStreak + 1 : 0
+        routineStreak: wasPerfectDay ? profile.routineStreak + 1 : usesGraceDay ? profile.routineStreak : 0,
+        longestStreak: Math.max(profile.longestStreak, longestTaskStreak)
       };
 
       this.saveProfile(newProfile);
@@ -507,8 +555,8 @@ export const localDb = {
 
   extractSquadId(input: string): string {
     const trimmed = input.trim();
-    // Regular expression for hub-xxx matching Android regex: (hub-[a-z0-9\-]+)
-    const hubRegex = /(hub-[a-z0-9\-]+)/i;
+    // Regular expression for hub-xxx matching Android regex: (hub-[a-z0-9-]+)
+    const hubRegex = /(hub-[a-z0-9-]+)/i;
     const match = trimmed.match(hubRegex);
     if (match) {
       return match[1].toLowerCase().trim();
@@ -619,25 +667,30 @@ export const localDb = {
   },
 
   saveDailyHabits(habits: DailyHabits) {
-    this.saveHabit(habits);
+    const previousHabits = this.getAllHabits().find(h => h.dateString === habits.dateString);
+    const normalizedHabits = this.normalizeHabit(habits);
+    this.saveHabit(normalizedHabits);
 
     // Sync habits back to tasks if it's for today
-    if (habits.dateString === getTodayDateString()) {
+    if (normalizedHabits.dateString === getTodayDateString()) {
       const tasks = this.getTasks();
       const updatedTasks = tasks.map(t => {
         const lowerName = t.name.toLowerCase();
-        if (lowerName.includes("gym")) return { ...t, isCompleted: habits.gymCompleted };
-        if (lowerName.includes("diet")) return { ...t, isCompleted: habits.dietCompleted };
-        if (lowerName.includes("skincare")) return { ...t, isCompleted: habits.skincareCompleted };
-        if (lowerName.includes("sleep")) return { ...t, isCompleted: habits.sleepCompleted };
+        if (lowerName.includes("gym")) return { ...t, isCompleted: normalizedHabits.gymCompleted };
+        if (lowerName.includes("diet")) return { ...t, isCompleted: normalizedHabits.dietCompleted };
+        if (lowerName.includes("skincare")) return { ...t, isCompleted: normalizedHabits.skincareCompleted };
+        if (lowerName.includes("sleep")) return { ...t, isCompleted: normalizedHabits.sleepCompleted };
         return t;
       });
       this.saveTasks(updatedTasks);
     }
 
     const profile = this.getProfile();
-    const isPerfect = habits.gymCompleted && habits.dietCompleted && habits.skincareCompleted && habits.sleepCompleted;
-    if (isPerfect) {
+    const isPerfect = normalizedHabits.gymCompleted && normalizedHabits.dietCompleted && normalizedHabits.skincareCompleted && normalizedHabits.sleepCompleted;
+    const wasAlreadyPerfect = previousHabits
+      ? previousHabits.gymCompleted && previousHabits.dietCompleted && previousHabits.skincareCompleted && previousHabits.sleepCompleted
+      : false;
+    if (isPerfect && !wasAlreadyPerfect) {
       profile.xp += 5;
       this.saveProfile(profile);
       if (auth.currentUser) {

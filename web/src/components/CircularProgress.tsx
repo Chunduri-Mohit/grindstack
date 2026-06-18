@@ -13,7 +13,7 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
   percentage,
   size = 140,
   strokeWidth = 10,
-  accentColor = "var(--accent-orange)",
+  accentColor = "var(--accent-lime)",
   centerValue,
   centerText
 }) => {

@@ -24,7 +24,7 @@ export const HabitChecklist: React.FC<HabitChecklistProps> = ({
   items,
   onToggle,
   variant = "default",
-  colorClass = "var(--accent-green)"
+  colorClass = "var(--accent-lime)"
 }) => {
   if (variant === "minimal") {
     return (
@@ -41,79 +41,66 @@ export const HabitChecklist: React.FC<HabitChecklistProps> = ({
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
           {items.map(item => (
-            <div key={item.key} className="checklist-item">
-              <div 
-                className={`checkbox-custom ${item.checked ? "checked" : ""}`}
-                onClick={() => onToggle(item.key)}
-                style={{ borderColor: colorClass }}
-              >
-                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </div>
-              <span 
+            <button
+              key={item.key}
+              type="button"
+              className="habit-row"
+              onClick={() => onToggle(item.key)}
+              style={{ padding: "10px 0" }}
+            >
+              <span className={`circle-status ${item.checked ? "checked" : ""}`} aria-hidden="true">
+                {item.checked && <span className="material-symbols-outlined" style={{ fontSize: 16 }}>check</span>}
+              </span>
+              <span
                 className={`checklist-label ${item.checked ? "completed" : ""}`}
-                onClick={() => onToggle(item.key)}
+                style={{ flex: 1, textAlign: "left" }}
               >
                 {item.title}
                 {item.streak && item.streak > 0 && (
-                  <span className="text-xs" style={{ marginLeft: "8px", color: "var(--accent-green)" }}>⚡ {item.streak}</span>
+                  <span className="text-xs" style={{ marginLeft: "8px", color: "var(--accent-lime)" }}>{item.streak}d</span>
                 )}
               </span>
-            </div>
+            </button>
           ))}
         </div>
       </div>
     );
   }
 
-  // Default variant with modern styling
   return (
-    <div className="space-y-2">
-      {description && (
-        <div className="px-1">
-          <h3 className="font-label-caps text-[10px] text-on-surface-variant tracking-widest uppercase mb-2">
-            {title}
-          </h3>
-          <p className="text-xs text-on-surface-variant">{description}</p>
+    <div className="flex-column" style={{ gap: 10 }}>
+      {(title || description) && (
+        <div>
+          {title && <h3 className="section-label">{title}</h3>}
+          {description && <p className="text-xs" style={{ marginTop: 4 }}>{description}</p>}
         </div>
       )}
-      <div className="space-y-2">
+      <div className="flex-column" style={{ gap: 8 }}>
         {items.map(item => (
-          <div
+          <button
             key={item.key}
+            type="button"
             onClick={() => onToggle(item.key)}
-            className="glass-panel rounded-xl p-4 flex items-center justify-between group hover:bg-white/[0.05] transition-colors cursor-pointer"
+            className="habit-row glass-panel"
           >
-            <div className="flex items-center gap-4">
+            <div className="log-row" style={{ padding: 0, justifyContent: "flex-start", minWidth: 0 }}>
               {item.icon && (
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center border border-white/5 transition-colors ${
-                  item.checked ? "bg-emerald-500/10 text-emerald-400" : "bg-surface-container text-on-surface-variant group-hover:text-primary"
-                }`}>
-                  <span className="material-symbols-outlined">{item.icon}</span>
-                </div>
+                <span
+                  className="row-icon"
+                  style={{ background: item.checked ? "rgba(201, 242, 76, 0.16)" : "rgba(255,255,255,0.05)" }}
+                >
+                  <span className="material-symbols-outlined" aria-hidden="true">{item.icon}</span>
+                </span>
               )}
-              <div className="flex flex-col">
-                <span className="font-card-title text-sm text-on-surface font-semibold">{item.title}</span>
-                {item.category && (
-                  <span className="font-body text-[11px] text-emerald-400 font-semibold mt-0.5">
-                    {item.category.toUpperCase()}
-                  </span>
-                )}
+              <div style={{ minWidth: 0, textAlign: "left" }}>
+                <p className="habit-title">{item.title}</p>
+                {item.category && <p className="habit-subtitle">{item.category.toUpperCase()}</p>}
               </div>
             </div>
-
-            {/* Circle Checkbox */}
-            <div className={`w-6 h-6 rounded-full border flex items-center justify-center transition-all ${
-              item.checked 
-                ? "bg-emerald-500 border-emerald-500 text-black" 
-                : "border-white/20"
-            }`}>
-              {item.checked && (
-                <span className="material-symbols-outlined text-[16px] font-bold">check</span>
-              )}
-            </div>
-          </div>
+            <span className={`circle-status ${item.checked ? "checked" : ""}`} aria-hidden="true">
+              {item.checked && <span className="material-symbols-outlined" style={{ fontSize: 16 }}>check</span>}
+            </span>
+          </button>
         ))}
       </div>
     </div>

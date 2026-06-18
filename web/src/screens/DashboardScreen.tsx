@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useAuth } from "../context/AuthContext";
+import React, { useMemo, useRef, useState } from "react";
+import { useAuth } from "../context/useAuth";
 import { localDb } from "../db/localDb";
 import type { DailyHabits, Task } from "../db/localDb";
 import { GlassCard } from "../components/GlassCard";
@@ -69,8 +69,8 @@ const moveItem = <T,>(items: T[], fromIndex: number, toIndex: number) => {
 
 export const DashboardScreen: React.FC = () => {
   const { profile, refreshProfile } = useAuth();
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [habitsHistory, setHabitsHistory] = useState<DailyHabits[]>([]);
+  const [tasks, setTasks] = useState<Task[]>(() => localDb.getTasks());
+  const [habitsHistory, setHabitsHistory] = useState<DailyHabits[]>(() => localDb.getAllHabits());
   const [selectedFilter, setSelectedFilter] = useState<TaskFilter>("all");
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [newTaskName, setNewTaskName] = useState("");
@@ -83,15 +83,6 @@ export const DashboardScreen: React.FC = () => {
   const dragSourceTaskIdRef = useRef<string | null>(null);
   const dragOverTaskIdRef = useRef<string | null>(null);
   const taskRowRefs = useRef<Record<string, HTMLDivElement | null>>({});
-
-  const refreshLocalState = () => {
-    setTasks(localDb.getTasks());
-    setHabitsHistory(localDb.getAllHabits());
-  };
-
-  useEffect(() => {
-    refreshLocalState();
-  }, []);
 
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter(t => t.isCompleted).length;
@@ -221,7 +212,7 @@ export const DashboardScreen: React.FC = () => {
   };
 
   const getWeeklyChartData = () => {
-    const days = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+    const days = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
     const today = new Date();
 
     return Array.from({ length: 7 }, (_, index) => {
@@ -234,17 +225,35 @@ export const DashboardScreen: React.FC = () => {
         : 0;
 
       return {
-        day: days[d.getDay() === 0 ? 6 : d.getDay() - 1],
+        day: days[d.getDay()],
         value
       };
     });
   };
 
+  const remainingGrace = Math.max(0, profile.graceDaysAllowedThisWeek - profile.graceDaysUsedThisWeek);
+  const statusText = totalTasks === 0
+    ? "Add a goal"
+    : completedTasks === totalTasks
+      ? "Safe today"
+      : remainingGrace === 0
+        ? "No grace left"
+        : `${remainingGrace} grace left`;
+
+  const hour = new Date().getHours();
+  const greeting = hour >= 5 && hour <= 11
+    ? "Good morning"
+    : hour >= 12 && hour <= 16
+      ? "Good afternoon"
+      : hour >= 17 && hour <= 21
+        ? "Good evening"
+        : "Late night grind";
+
   return (
     <div className="screen-content dashboard-screen">
       <div className="dashboard-header">
         <div>
-          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>Good grind</p>
+          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>{greeting}</p>
           <h2 className="bold" style={{ fontSize: "28px", margin: "2px 0" }}>{profile.username}</h2>
           <div className="dashboard-stat-row">
             <span>Level {level}</span>
@@ -268,7 +277,7 @@ export const DashboardScreen: React.FC = () => {
           </div>
           <div className="dashboard-stat-row">
             <span>Streak {profile.longestStreak}d</span>
-            <span>{completionPercentage}% complete</span>
+            <span>{statusText}</span>
           </div>
         </div>
         <CircularProgress
@@ -384,8 +393,8 @@ export const DashboardScreen: React.FC = () => {
         <LineChart
           data={getWeeklyChartData()}
           title="Weekly Consistency Tracker"
-          description="Habits completed per day this week (0-4 scale: Gym, Diet, Skincare, Sleep)"
-          color="#4ade80"
+          description="Habits completed each day"
+          color="var(--accent-lime)"
           maxValue={4}
         />
       </GlassCard>

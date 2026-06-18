@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { AuthProvider, useAuth } from "./context/AuthContext";
+import { AuthProvider } from "./context/AuthContext";
+import { useAuth } from "./context/useAuth";
 import { Navigation, type ScreenType } from "./components/Navigation";
 import { LoginScreen } from "./screens/LoginScreen";
 import { DashboardScreen } from "./screens/DashboardScreen";
@@ -60,7 +61,7 @@ function AppContent() {
       case "dashboard": return "DASHBOARD";
       case "academy": return "ACADEMY";
       case "wellbeing": return "WELLBEING";
-      case "squad": return "SQUAD TRIBE";
+      case "squad": return "SQUAD";
       case "profile": return "PROFILE";
       default: return "GRINDSTACK";
     }
