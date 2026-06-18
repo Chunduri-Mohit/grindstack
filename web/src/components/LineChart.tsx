@@ -23,7 +23,7 @@ export const LineChart: React.FC<LineChartProps> = ({
   maxValue
 }) => {
   const chartHeight = 160;
-  const chartWidth = 100;
+  const chartWidth = 400;
   const gradientId = `gradient-${useId().replace(/:/g, "")}`;
 
   // Calculate max value for scaling
@@ -63,7 +63,7 @@ export const LineChart: React.FC<LineChartProps> = ({
           width="100%"
           height="220"
           viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-          preserveAspectRatio="none"
+          preserveAspectRatio="xMidYMid meet"
           className="line-chart-svg"
         >
           {/* Gradient Definition */}
@@ -89,7 +89,7 @@ export const LineChart: React.FC<LineChartProps> = ({
 
           {/* Y-axis labels */}
           {[0, 0.25, 0.5, 0.75, 1].map((tick, i) => {
-            const value = Math.round(min + tick * (max - min));
+            const value = Math.round(max - tick * (max - min));
             return (
               <text
                 key={`label-${i}`}
