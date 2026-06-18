@@ -1108,10 +1108,19 @@ button {
 }
 
 .habit-row {
+  width: 100%;
+  border: 0;
+  background: transparent;
   cursor: pointer;
   padding: 14px;
   border-radius: 18px;
+  color: inherit;
+  text-align: left;
   transition: var(--transition-smooth);
+}
+
+.habit-row > .log-row {
+  flex: 1;
 }
 
 .habit-row + .habit-row {

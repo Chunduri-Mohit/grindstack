@@ -94,11 +94,11 @@ export const WellbeingScreen: React.FC = () => {
               type="button"
               onClick={() => toggleHabit(item.key)}
             >
-              <div className="log-row" style={{ padding: 0, justifyContent: "flex-start", minWidth: 0 }}>
+              <div className="log-row" style={{ padding: 0, justifyContent: "flex-start", minWidth: 0, flex: 1 }}>
                 <span className="row-icon" style={{ background: checked ? "rgba(201, 242, 76, 0.16)" : "rgba(255, 255, 255, 0.05)" }}>
                   <span className="material-symbols-outlined" aria-hidden="true">{item.icon}</span>
                 </span>
-                <div style={{ minWidth: 0, textAlign: "left" }}>
+                <div style={{ minWidth: 0, flex: 1, textAlign: "left" }}>
                   <p className="habit-title">{item.title}</p>
                   <p className="habit-subtitle">HEALTH</p>
                 </div>
