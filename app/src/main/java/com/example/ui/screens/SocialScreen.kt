@@ -1,13 +1,16 @@
 package com.example.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -17,7 +20,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -44,604 +49,404 @@ fun SocialScreen(
 
     val currentGroupId = profile?.currentGroupId
     LaunchedEffect(currentGroupId) {
-        if (currentGroupId != null) {
-            viewModel.syncSquadMembers(currentGroupId)
-        }
+        if (currentGroupId != null) viewModel.syncSquadMembers(currentGroupId)
     }
 
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
             .background(Color.Transparent)
-            .padding(horizontal = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(top = 24.dp, bottom = 90.dp)
+            .padding(horizontal = 22.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp),
+        contentPadding = PaddingValues(top = 8.dp, bottom = 104.dp)
     ) {
-        // Module Introduction
         item {
-            Column {
+            Column(modifier = Modifier.fadeSlideIn()) {
                 Text(
-                    text = "SQUAD TRIBES",
+                    text = "Squad",
                     style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = WarmAccentWhite
+                        fontWeight = FontWeight.Bold, color = TextPrimary, fontSize = 32.sp, letterSpacing = (-0.8).sp
                     )
                 )
-                Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Join shared hubs via magic links and sync task streaks live with your peers.",
-                    style = MaterialTheme.typography.bodyMedium.copy(color = MutedWarmWhite)
+                    text = "Grind together. Hold the line.",
+                    style = MaterialTheme.typography.bodyMedium.copy(color = TextSecondary, fontSize = 14.sp)
                 )
             }
         }
 
-        // Check if joined
-        if (profile?.currentGroupId == null) {
+        if (currentGroupId == null) {
+            // ---- Empty state + join/create -------------------------------
             item {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    // Toggle between Join and Create
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .glassCard(shape = RoundedCornerShape(16.dp))
-                            .padding(4.dp)
+                Column(
+                    modifier = Modifier.fillMaxWidth().fadeSlideIn(delayMillis = 70),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.auroraGlow(color = Primary, alpha = 0.22f, radiusScale = 0.7f)
                     ) {
                         Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(if (!isCreatingNewSquad) WarmAccentWhite else Color.Transparent)
-                                .clickable { isCreatingNewSquad = false }
-                                .padding(vertical = 8.dp),
+                            modifier = Modifier.size(84.dp).clip(CircleShape).background(Primary.copy(alpha = 0.14f)),
                             contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "JOIN SQUAD",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (!isCreatingNewSquad) SpaceBlack else MutedWarmWhite
-                                )
-                            )
-                        }
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(if (isCreatingNewSquad) WarmAccentWhite else Color.Transparent)
-                                .clickable { isCreatingNewSquad = true }
-                                .padding(vertical = 8.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "CREATE SQUAD",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isCreatingNewSquad) SpaceBlack else MutedWarmWhite
-                                )
-                            )
-                        }
+                        ) { Icon(Icons.Default.Groups, contentDescription = null, tint = Primary, modifier = Modifier.size(38.dp)) }
+                    }
+                    Spacer(Modifier.height(14.dp))
+                    Text("You're solo right now", style = MaterialTheme.typography.titleMedium.copy(color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp))
+                    Text(
+                        "Join a squad or start your own to compete on a live leaderboard.",
+                        style = MaterialTheme.typography.bodyMedium.copy(color = TextSecondary, fontSize = 13.sp),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                    )
+                }
+            }
+
+            item {
+                // Segmented toggle
+                Row(
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color.White.copy(alpha = 0.05f)).padding(4.dp)
+                ) {
+                    SegTab("Join", !isCreatingNewSquad, Modifier.weight(1f)) { isCreatingNewSquad = false }
+                    SegTab("Create", isCreatingNewSquad, Modifier.weight(1f)) { isCreatingNewSquad = true }
+                }
+            }
+
+            item {
+                Column(
+                    modifier = Modifier.fillMaxWidth().glassCard(shape = RoundedCornerShape(24.dp)).padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    if (isCreatingNewSquad) {
+                        OutlinedTextField(
+                            value = groupNameInput,
+                            onValueChange = { groupNameInput = it },
+                            label = { Text("Squad name", color = TextMuted) },
+                            placeholder = { Text("e.g. FAANG 10x Grinders", color = TextMuted.copy(alpha = 0.5f)) },
+                            modifier = Modifier.fillMaxWidth().testTag("group_name_input"),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = squadFieldColors()
+                        )
+                    } else {
+                        OutlinedTextField(
+                            value = groupLinkInput,
+                            onValueChange = { groupLinkInput = it; joinLinkError = null },
+                            label = { Text("Invite code / link", color = TextMuted) },
+                            placeholder = { Text("grindstack.app/hub-xplqrs1", color = TextMuted.copy(alpha = 0.5f)) },
+                            isError = joinLinkError != null,
+                            supportingText = joinLinkError?.let { { Text(it, color = MaterialTheme.colorScheme.error) } },
+                            modifier = Modifier.fillMaxWidth().testTag("group_link_input"),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = squadFieldColors()
+                        )
                     }
 
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .glassCard(shape = RoundedCornerShape(16.dp))
-                            .padding(20.dp)
+                            .fillMaxWidth().height(54.dp).clip(RoundedCornerShape(16.dp))
+                            .auroraGlow(Primary, 0.25f, 0.55f)
+                            .background(auroraBrush())
+                            .pressScale {
+                                if (isCreatingNewSquad) {
+                                    val name = if (groupNameInput.isBlank()) "Standard Grinding Corps" else groupNameInput
+                                    val id = "hub-${name.lowercase().replace(" ", "-")}-${(1000..9999).random()}"
+                                    viewModel.joinGroup(id, name)
+                                } else {
+                                    if (groupLinkInput.isBlank()) joinLinkError = "Invite link is required."
+                                    else { joinLinkError = null; viewModel.joinGroup(groupLinkInput.trim(), groupLinkInput.trim()) }
+                                }
+                            }
+                            .testTag("join_group_btn"),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Column {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    if (isCreatingNewSquad) Icons.Default.AddBusiness else Icons.Default.GroupAdd,
-                                    contentDescription = null,
-                                    tint = WarmAccentWhite
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = if (isCreatingNewSquad) "CREATE NEW SQUAD" else "JOIN SQUAD SYNC",
-                                    style = MaterialTheme.typography.labelMedium.copy(
-                                        fontSize = 11.sp,
-                                        color = MutedWarmWhite,
-                                        letterSpacing = 1.1.sp
-                                    )
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(20.dp))
-
-                            if (isCreatingNewSquad) {
-                                OutlinedTextField(
-                                    value = groupNameInput,
-                                    onValueChange = { groupNameInput = it },
-                                    label = { Text("Squad Name", color = TextGray) },
-                                    placeholder = { Text("e.g. FAANG 10x Grinders", color = TextGray.copy(alpha = 0.3f)) },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .testTag("group_name_input"),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = WarmAccentWhite,
-                                        unfocusedBorderColor = Color.White.copy(alpha = 0.1f),
-                                        focusedTextColor = WarmAccentWhite,
-                                        unfocusedTextColor = WarmAccentWhite
-                                    )
-                                )
-                            } else {
-                                OutlinedTextField(
-                                    value = groupLinkInput,
-                                    onValueChange = {
-                                        groupLinkInput = it
-                                        joinLinkError = null
-                                    },
-                                    label = { Text("Invite Link / Magic Connection String", color = TextGray) },
-                                    placeholder = { Text("grindstack.app/hub-xplqrs1", color = TextGray.copy(alpha = 0.3f)) },
-                                    isError = joinLinkError != null,
-                                    supportingText = if (joinLinkError != null) {
-                                        { Text(joinLinkError!!, color = MaterialTheme.colorScheme.error) }
-                                    } else null,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .testTag("group_link_input"),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = WarmAccentWhite,
-                                        unfocusedBorderColor = Color.White.copy(alpha = 0.1f),
-                                        focusedTextColor = WarmAccentWhite,
-                                        unfocusedTextColor = WarmAccentWhite,
-                                        errorBorderColor = MaterialTheme.colorScheme.error
-                                    )
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(20.dp))
-
-                            GrindButton(
-                                text = if (isCreatingNewSquad) "INITIATE SQUAD" else "JOIN SQUAD",
-                                onClick = {
-                                    if (isCreatingNewSquad) {
-                                        val name = if (groupNameInput.isBlank()) "Standard Grinding Corps" else groupNameInput
-                                        val id = "hub-${name.lowercase().replace(" ", "-")}-${(1000..9999).random()}"
-                                        viewModel.joinGroup(id, name)
-                                    } else {
-                                        if (groupLinkInput.isBlank()) {
-                                            joinLinkError = "You need an invite link to join a squad. Ask a squad member to share theirs!"
-                                        } else {
-                                            joinLinkError = null
-                                            viewModel.joinGroup(groupLinkInput.trim(), groupLinkInput.trim())
-                                        }
-                                    }
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag("join_group_btn")
-                            )
-
-                            Spacer(modifier = Modifier.height(14.dp))
-
-                            Text(
-                                text = if (isCreatingNewSquad)
-                                    "💡 Pro Tip: Creating a squad generates a unique Magic Link you can share with your team."
-                                    else "🔗 Paste an invite link from a squad member to join their tribe.",
-                                style = MaterialTheme.typography.bodyMedium.copy(color = TextGray)
-                            )
-                        }
+                        Text(if (isCreatingNewSquad) "CREATE SQUAD" else "JOIN SQUAD", style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.White))
                     }
+
+                    Text(
+                        text = if (isCreatingNewSquad) "Creating a squad generates a unique link you can share with your team."
+                        else "Paste an invite link from a squad member to join their tribe.",
+                        style = MaterialTheme.typography.bodyMedium.copy(color = TextMuted, fontSize = 12.sp)
+                    )
                 }
             }
         } else {
-            // Group Info Card
+            val collectivePct = if (leaderboard.isNotEmpty()) leaderboard.map { it.dailyCompletionPercentage }.average().toInt() else 0
+
+            // ---- Squad hero --------------------------------------------------
             item {
-                Box(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .glassCard(shape = RoundedCornerShape(16.dp))
-                        .padding(16.dp)
+                        .clip(RoundedCornerShape(28.dp))
+                        .background(Brush.linearGradient(listOf(Primary.copy(alpha = 0.16f), Secondary.copy(alpha = 0.06f))))
+                        .padding(22.dp),
+                    verticalArrangement = Arrangement.spacedBy(18.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(8.dp)
-                                        .background(WarmAccentWhite, CircleShape)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = profile?.currentGroupName?.uppercase() ?: "SQUAD TRIBES",
-                                    style = MaterialTheme.typography.titleMedium.copy(
-                                        color = WarmAccentWhite,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(4.dp))
-                            
-                            val context = androidx.compose.ui.platform.LocalContext.current
-                            val groupId = profile?.currentGroupId ?: ""
-                            val squadName = profile?.currentGroupName ?: ""
-                            
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.clickable {
-                                    val sendIntent = android.content.Intent().apply {
-                                        action = android.content.Intent.ACTION_SEND
-                                        putExtra(android.content.Intent.EXTRA_TEXT, "Join my GrindStack Squad: $squadName\nMagic Link: grindstack.app/$groupId")
-                                        type = "text/plain"
-                                    }
-                                    val shareIntent = android.content.Intent.createChooser(sendIntent, null)
-                                    context.startActivity(shareIntent)
-                                }
-                            ) {
-                                Text(
-                                    text = "Code ID: $groupId",
-                                    style = MaterialTheme.typography.bodyMedium.copy(color = TextGray)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Icon(
-                                    Icons.Default.Share,
-                                    contentDescription = "Share Link",
-                                    tint = TextGray,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                            }
-                        }
-                        IconButton(
-                            onClick = { viewModel.leaveGroup() },
-                            modifier = Modifier
-                                .testTag("leave_group_btn")
-                                .background(Color(0x0AFFFFFF), RoundedCornerShape(8.dp))
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.ExitToApp,
-                                contentDescription = "Leave Squad",
-                                tint = Color.Red
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Leaderboard Header
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "LEADERBOARD RANKINGS",
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            fontSize = 11.sp,
-                            color = MutedWarmWhite,
-                            letterSpacing = 1.1.sp
-                        )
-                    )
-                    IconButton(
-                        onClick = { profile?.currentGroupId?.let { viewModel.syncSquadMembers(it) } },
-                        modifier = Modifier.size(24.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "Refresh",
-                            tint = TextGray,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                }
-            }
-
-            // Score explanation metrics
-            item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .glassCard(shape = RoundedCornerShape(16.dp))
-                        .padding(12.dp)
-                ) {
-                    Text(
-                        text = "⚖️ Combined score = Daily Done % + Longest Streak * 2 + All-Time Tasks * 0.1",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            color = MutedWarmWhite,
-                            fontSize = 11.sp
-                        )
-                    )
-                }
-            }
-
-            if (leaderboard.isEmpty()) {
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 40.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Default.Group, contentDescription = null, tint = TextGray.copy(alpha = 0.3f), modifier = Modifier.size(48.dp))
-                            Spacer(modifier = Modifier.height(12.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("ACTIVE SQUAD", style = MaterialTheme.typography.labelSmall.copy(color = Primary, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, fontSize = 10.sp))
+                            Spacer(Modifier.height(3.dp))
                             Text(
-                                text = "Your tribe is empty.\nShare the link to recruit grinders!",
-                                style = MaterialTheme.typography.bodyMedium.copy(color = TextGray),
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                profile?.currentGroupName ?: "Morning Protocol",
+                                style = MaterialTheme.typography.titleMedium.copy(color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 20.sp)
                             )
+                        }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.clip(RoundedCornerShape(9999.dp)).background(Color.White.copy(alpha = 0.06f)).padding(horizontal = 10.dp, vertical = 5.dp)
+                        ) {
+                            Box(Modifier.size(6.dp).background(CyberGreen, CircleShape))
+                            Spacer(Modifier.width(6.dp))
+                            Text("${leaderboard.size} members", style = MaterialTheme.typography.labelSmall.copy(color = TextSecondary, fontSize = 10.sp))
+                        }
+                    }
+
+                    Column {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Collective completion", style = MaterialTheme.typography.bodyMedium.copy(color = TextSecondary, fontSize = 13.sp))
+                            Text("$collectivePct%", style = MaterialTheme.typography.bodyMedium.copy(color = Primary, fontWeight = FontWeight.Bold))
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        val animPct by animateFloatAsState(collectivePct / 100f, tween(800, easing = FastOutSlowInEasing), label = "coll")
+                        Box(modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)).background(Color.White.copy(alpha = 0.08f))) {
+                            Box(Modifier.fillMaxWidth(animPct).fillMaxHeight().clip(RoundedCornerShape(4.dp)).background(auroraBrush()))
+                        }
+                    }
+
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Row {
+                            leaderboard.take(4).forEachIndexed { i, member ->
+                                Box(
+                                    modifier = Modifier.size(34.dp).offset(x = (i * -10).dp).clip(CircleShape)
+                                        .background(SurfaceVariant).border(2.dp, Background, CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) { Text(getAvatarEmoji(member.profilePic), fontSize = 15.sp) }
+                            }
+                        }
+                        val context = LocalContext.current
+                        val groupId = profile?.currentGroupId ?: ""
+                        val squadName = profile?.currentGroupName ?: ""
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp),
+                                modifier = Modifier.clip(RoundedCornerShape(9999.dp)).background(Primary.copy(alpha = 0.14f))
+                                    .pressScale {
+                                        val send = android.content.Intent().apply {
+                                            action = android.content.Intent.ACTION_SEND
+                                            putExtra(android.content.Intent.EXTRA_TEXT, "Join my Squad: $squadName (ID: $groupId)")
+                                            type = "text/plain"
+                                        }
+                                        context.startActivity(android.content.Intent.createChooser(send, null))
+                                    }
+                                    .padding(horizontal = 14.dp, vertical = 8.dp)
+                            ) {
+                                Icon(Icons.Default.Share, contentDescription = null, tint = Primary, modifier = Modifier.size(13.dp))
+                                Text("Invite", style = MaterialTheme.typography.labelSmall.copy(color = Primary, fontWeight = FontWeight.Bold, fontSize = 11.sp))
+                            }
+                            Box(
+                                modifier = Modifier.size(34.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.05f)).pressScale(scaleDown = 0.9f) { viewModel.leaveGroup() },
+                                contentAlignment = Alignment.Center
+                            ) { Icon(Icons.Default.Logout, contentDescription = "Leave", tint = Tertiary, modifier = Modifier.size(16.dp)) }
                         }
                     }
                 }
             }
 
-            // Leaderboard entries list
-            itemsIndexed(leaderboard) { index, member ->
-                LeaderboardPlayerRow(
-                    rank = index + 1,
-                    member = member,
-                    onClick = { selectedPlayerForDetails = member }
-                )
-                Spacer(modifier = Modifier.height(10.dp))
+            // ---- Leaderboard -------------------------------------------------
+            item {
+                Column(
+                    modifier = Modifier.fillMaxWidth().glassCard(shape = RoundedCornerShape(24.dp)).padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.EmojiEvents, contentDescription = null, tint = AuroraGold(), modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Leaderboard", style = MaterialTheme.typography.titleMedium.copy(color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp))
+                    }
+                    leaderboard.forEachIndexed { idx, member ->
+                        LeaderboardRow(idx, member) { selectedPlayerForDetails = member }
+                    }
+                }
+            }
+
+            // ---- Team completion chart --------------------------------------
+            item {
+                TeamCompletionChart(leaderboard = leaderboard)
             }
         }
     }
 
-    // Modal inspect popup showing custom user details
     selectedPlayerForDetails?.let { player ->
-        AlertDialog(
-            onDismissRequest = { selectedPlayerForDetails = null },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-                .glassCard(shape = RoundedCornerShape(16.dp)),
-            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
-            title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .background(WarmAccentWhite, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = getAvatarEmoji(player.profilePic),
-                            style = TextStyle(
-                                fontSize = 18.sp
-                            )
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = player.username,
-                        color = WarmAccentWhite,
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                    )
-                }
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    // Metrics Grid Row
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .glassCard(shape = RoundedCornerShape(16.dp))
-                            .padding(12.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceAround
-                        ) {
-                            MetricColumn(label = "DAILY DONE", value = "${player.dailyCompletionPercentage.toInt()}%")
-                            MetricColumn(label = "STREAK", value = "🔥 ${player.currentStreak}d")
-                            MetricColumn(label = "ALL-TIME", value = "🏅 ${player.totalTasksAllTime}")
-                        }
-                    }
-
-                    Text(
-                        text = "ACTIVE DONE TASKS:",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontSize = 10.sp,
-                            color = MutedWarmWhite,
-                            letterSpacing = 1.sp
-                        )
-                    )
-
-                    val tasksCompleted = player.activeBreakdown.split(",").filter { it.isNotBlank() }
-                    if (tasksCompleted.isEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .glassCard(shape = RoundedCornerShape(16.dp))
-                                .padding(12.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "No tasks completed yet today.",
-                                color = TextGray,
-                                fontSize = 13.sp
-                            )
-                        }
-                    } else {
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            tasksCompleted.forEach { taskName ->
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Icon(Icons.Default.CheckCircle, contentDescription = "Completed", tint = WarmAccentWhite, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(taskName, color = WarmAccentWhite, fontSize = 13.sp)
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { selectedPlayerForDetails = null }) {
-                    Text("CLOSE", color = WarmAccentWhite, fontWeight = FontWeight.Bold)
-                }
-            },
-            containerColor = SpaceBlack
-        )
+        PlayerDialog(player) { selectedPlayerForDetails = null }
     }
 }
 
 @Composable
-fun LeaderboardPlayerRow(
-    rank: Int,
-    member: GroupMember,
-    onClick: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .glassCard(
-                shape = RoundedCornerShape(16.dp),
-                borderAlpha = if (member.isMe) 0.35f else 0.08f
-            )
-            .clickable { onClick() }
-            .testTag("leaderboard_row_${member.username}")
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                // Rank Styling as per specification:
-                // - 1st: Solid gold badge/accent
-                // - 2nd/3rd: Thin accent border
-                // - others: muted warm white
-                val rankBg = when (rank) {
-                    1 -> Color(0xFFFFD700)
-                    else -> Color.Transparent
-                }
-                val rankTextCol = when (rank) {
-                    1 -> SpaceBlack
-                    else -> Color.White.copy(alpha = 0.5f)
-                }
-                val rankBorder = when (rank) {
-                    1 -> null
-                    2 -> BorderStroke(1.dp, Color(0xFFC0C0C0))
-                    3 -> BorderStroke(1.dp, Color(0xFFCD7F32))
-                    else -> BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
-                }
-
-                Box(
-                    modifier = Modifier
-                        .size(30.dp)
-                        .clip(CircleShape)
-                        .background(rankBg)
-                        .then(if (rankBorder != null) Modifier.border(rankBorder, CircleShape) else Modifier),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "$rank",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            color = rankTextCol,
-                            fontWeight = FontWeight.Bold
-                        )
+private fun TeamCompletionChart(leaderboard: List<GroupMember>) {
+    Column(modifier = Modifier.fillMaxWidth().glassCard(shape = RoundedCornerShape(24.dp)).padding(20.dp)) {
+        Text("Team completion", style = MaterialTheme.typography.titleMedium.copy(color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 17.sp))
+        Text("Today's completion by squad member", style = MaterialTheme.typography.bodyMedium.copy(color = TextMuted, fontSize = 12.sp))
+        Spacer(Modifier.height(16.dp))
+        if (leaderboard.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxWidth().height(96.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "No squad data synced yet.",
+                    style = MaterialTheme.typography.bodyMedium.copy(color = TextMuted, fontSize = 13.sp)
+                )
+            }
+        } else {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                items(leaderboard, key = { it.userId }) { member ->
+                    val heightPct = member.dailyCompletionPercentage.coerceIn(0f, 100f)
+                    var shown by remember { mutableStateOf(false) }
+                    LaunchedEffect(member.userId, heightPct) { shown = true }
+                    val animH by animateFloatAsState(
+                        if (shown) heightPct / 100f else 0f,
+                        tween(520, easing = FastOutSlowInEasing), label = "bar"
                     )
-                }
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                // User Avatar initials Circle
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .background(Color(0x14FFFFFF), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = getAvatarEmoji(member.profilePic),
-                        style = TextStyle(
-                            fontSize = 18.sp
-                        )
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                // Soldier names (spec: 15px medium)
-                Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = member.username,
-                            style = MaterialTheme.typography.bodyLarge.copy(
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = WarmAccentWhite
-                            )
-                        )
-                        if (member.isMe) {
-                            Spacer(modifier = Modifier.width(6.dp))
+                    Column(
+                        modifier = Modifier.width(46.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Column(modifier = Modifier.height(120.dp), verticalArrangement = Arrangement.Bottom, horizontalAlignment = Alignment.CenterHorizontally) {
                             Box(
                                 modifier = Modifier
-                                    .background(WarmAccentWhite, RoundedCornerShape(4.dp))
-                                    .padding(horizontal = 4.dp, vertical = 2.dp)
-                            ) {
-                                Text(
-                                    text = "YOU",
-                                    style = MaterialTheme.typography.labelSmall.copy(color = SpaceBlack, fontSize = 8.sp, fontWeight = FontWeight.Black)
-                                )
-                            }
+                                    .width(18.dp)
+                                    .fillMaxHeight(animH)
+                                    .clip(RoundedCornerShape(topStart = 5.dp, topEnd = 5.dp))
+                                    .background(
+                                        if (heightPct >= 80f) auroraBrush()
+                                        else Brush.verticalGradient(listOf(Primary.copy(alpha = 0.35f), Primary.copy(alpha = 0.15f)))
+                                    )
+                            )
                         }
+                        Text(getAvatarEmoji(member.profilePic), fontSize = 15.sp, maxLines = 1)
+                        Text(
+                            "${heightPct.toInt()}%",
+                            style = MaterialTheme.typography.labelSmall.copy(color = TextMuted, fontSize = 10.sp),
+                            maxLines = 1
+                        )
                     }
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = "${member.totalTasksAllTime} tasks • ${member.xp} XP",
-                        style = MaterialTheme.typography.bodyMedium.copy(color = TextGray, fontSize = 12.sp)
-                    )
-                }
-            }
-
-            // Statistics column on right
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = "${member.dailyCompletionPercentage.toInt()}%",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            color = WarmAccentWhite,
-                            fontWeight = FontWeight.Bold
-                        )
-                    )
-                    Text(
-                        text = "DONE TODAY",
-                        style = MaterialTheme.typography.labelSmall.copy(color = TextGray, fontSize = 8.sp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(16.dp))
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = "🔥 ${member.currentStreak}d",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            color = DisciplinePillText,
-                            fontWeight = FontWeight.Bold
-                        )
-                    )
-                    Text(
-                        text = "STREAK",
-                        style = MaterialTheme.typography.labelSmall.copy(color = TextGray, fontSize = 8.sp)
-                    )
                 }
             }
         }
     }
+}
+
+@Composable
+private fun SegTab(label: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val bg by animateColorAsState(if (selected) Primary.copy(alpha = 0.18f) else Color.Transparent, tween(220), label = "segBg")
+    val text by animateColorAsState(if (selected) Primary else TextSecondary, tween(220), label = "segText")
+    Box(
+        modifier = modifier.clip(RoundedCornerShape(12.dp)).background(bg).clickable { onClick() }.padding(vertical = 11.dp),
+        contentAlignment = Alignment.Center
+    ) { Text(label, style = MaterialTheme.typography.labelMedium.copy(color = text, fontWeight = FontWeight.Bold, fontSize = 13.sp)) }
+}
+
+@Composable
+private fun LeaderboardRow(idx: Int, member: GroupMember, onClick: () -> Unit) {
+    val isMe = member.isMe
+    val rankBadge = when (idx) { 0 -> "🥇"; 1 -> "🥈"; 2 -> "🥉"; else -> String.format(java.util.Locale.US, "%02d", idx + 1) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(if (isMe) Primary.copy(alpha = 0.10f) else Color.Transparent)
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+            Box(modifier = Modifier.width(26.dp), contentAlignment = Alignment.Center) {
+                Text(rankBadge, style = MaterialTheme.typography.labelMedium.copy(color = if (isMe) Primary else TextSecondary, fontWeight = FontWeight.Bold, fontSize = if (idx < 3) 16.sp else 12.sp))
+            }
+            Spacer(Modifier.width(10.dp))
+            Box(modifier = Modifier.size(32.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.06f)), contentAlignment = Alignment.Center) {
+                Text(getAvatarEmoji(member.profilePic), fontSize = 15.sp)
+            }
+            Spacer(Modifier.width(12.dp))
+            Text(
+                member.username + if (isMe) "  (you)" else "",
+                style = MaterialTheme.typography.bodyLarge.copy(color = if (isMe) Primary else TextPrimary, fontWeight = FontWeight.Medium, fontSize = 14.sp),
+                maxLines = 1
+            )
+        }
+        Text("${member.dailyCompletionPercentage.toInt()}%", style = MaterialTheme.typography.labelMedium.copy(color = if (isMe) Primary else TextSecondary, fontWeight = FontWeight.Bold, fontSize = 14.sp))
+    }
+}
+
+@Composable
+private fun PlayerDialog(player: GroupMember, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.fillMaxWidth().padding(16.dp),
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(Primary.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
+                    Text(getAvatarEmoji(player.profilePic), fontSize = 20.sp)
+                }
+                Spacer(Modifier.width(12.dp))
+                Text(player.username, color = TextPrimary, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color.White.copy(alpha = 0.04f)).padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceAround
+                ) {
+                    MetricColumn("TODAY", "${player.dailyCompletionPercentage.toInt()}%")
+                    MetricColumn("STREAK", "${player.currentStreak}d")
+                    MetricColumn("ALL-TIME", "${player.totalTasksAllTime}")
+                }
+                val tasksCompleted = player.activeBreakdown.split(",").filter { it.isNotBlank() }
+                Text("COMPLETED TODAY", style = MaterialTheme.typography.labelSmall.copy(color = TextMuted, fontSize = 10.sp, letterSpacing = 1.sp))
+                if (tasksCompleted.isEmpty()) {
+                    Text("Nothing logged yet today.", color = TextMuted, fontSize = 13.sp)
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        tasksCompleted.forEach { t ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = CyberGreen, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text(t.trim(), color = TextPrimary, fontSize = 13.sp)
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("CLOSE", color = Primary, fontWeight = FontWeight.Bold) } },
+        containerColor = SurfaceContainer
+    )
 }
 
 @Composable
 fun MetricColumn(label: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(text = label, style = MaterialTheme.typography.labelSmall.copy(color = TextGray, fontSize = 9.sp))
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(text = value, style = MaterialTheme.typography.titleMedium.copy(color = WarmAccentWhite, fontWeight = FontWeight.Bold, fontSize = 16.sp))
+        Text(value, style = MaterialTheme.typography.titleMedium.copy(color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp))
+        Spacer(Modifier.height(4.dp))
+        Text(label, style = MaterialTheme.typography.labelSmall.copy(color = TextMuted, fontSize = 9.sp))
     }
 }
 
-private fun getAvatarEmoji(avatarId: String?): String {
-    return when (avatarId) {
-        "avatar_1" -> "🧑‍💻"
-        "avatar_2" -> "🦁"
-        "avatar_3" -> "🥋"
-        "avatar_4" -> "🚀"
-        else -> "🚀"
-    }
-}
+@Composable
+private fun squadFieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedBorderColor = Primary,
+    unfocusedBorderColor = Color.White.copy(alpha = 0.1f),
+    focusedTextColor = TextPrimary,
+    unfocusedTextColor = TextPrimary,
+    errorBorderColor = MaterialTheme.colorScheme.error
+)
 
+private fun AuroraGold() = Color(0xFFE6C06A)
+
+private fun getAvatarEmoji(avatarId: String?): String = when (avatarId) {
+    "avatar_1" -> "🧑‍💻"; "avatar_2" -> "🦁"; "avatar_3" -> "🥋"; "avatar_4" -> "🚀"; else -> "🚀"
+}

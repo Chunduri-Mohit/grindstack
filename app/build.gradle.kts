@@ -42,7 +42,14 @@ android {
       isCrunchPngs = false
       isMinifyEnabled = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-      signingConfig = signingConfigs.getByName("release")
+      // Use the real upload key when its file is present (CI / signed releases);
+      // otherwise fall back to the debug keystore so a local optimized (non-debuggable)
+      // release APK can always be built and installed for performance testing.
+      val uploadKey = signingConfigs.getByName("release").storeFile
+      signingConfig = if (uploadKey != null && uploadKey.exists())
+        signingConfigs.getByName("release")
+      else
+        signingConfigs.getByName("debugConfig")
     }
     debug {
       signingConfig = signingConfigs.getByName("debugConfig")

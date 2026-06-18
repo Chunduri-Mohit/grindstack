@@ -76,9 +76,9 @@ class GrindViewModel(private val repository: GrindRepository) : ViewModel() {
         // Checklist Nudge
         val incomplete = tasks.count { !it.isCompleted }
         if (incomplete == 2) {
-            list.add("🔥 Soft Nudge: You're 2 tasks away from 100% completion today!")
+            list.add("⚡ Soft Nudge: You're 2 tasks away from 100% completion today!")
         } else if (incomplete == 1) {
-            list.add("⚡ Almost There: Just 1 tasks left! Make today a perfect day!")
+            list.add("⚡ Almost There: Just 1 task left! Make today a perfect day!")
         } else if (tasks.isNotEmpty() && incomplete == 0) {
             list.add("🎉 Legendary Status: 100% task completion achieved! Streak safe!")
         } else {
@@ -110,17 +110,17 @@ class GrindViewModel(private val repository: GrindRepository) : ViewModel() {
     // Motivational Quote of the Day generator
     val quoteOfTheDay: StateFlow<String> = flowOf(Unit).map {
         val quotes = listOf(
-            "“First they ignore you, then they laugh at you, then they fight you, then you win.”",
-            "“The only bad workout is the one that didn't happen.”",
-            "“Stop speaking. Start writing. Start coding. Your stack doesn't build itself.”",
-            "“Discipline is choosing between what you want now and what you want most.”",
-            "“Code is like humor. When you have to explain it, it’s bad.”",
-            "“Do something today that your future self will thank you for.”",
-            "“The hard days are the days when you make the most speed.”"
+            "First they ignore you, then they laugh at you, then they fight you, then you win.",
+            "The only bad workout is the one that didn't happen.",
+            "Stop speaking. Start writing. Start coding. Your stack doesn't build itself.",
+            "Discipline is choosing between what you want now and what you want most.",
+            "Code is like humor. When you have to explain it, it's bad.",
+            "Do something today that your future self will thank you for.",
+            "The hard days are the days when you make the most speed."
         )
         val dayIndex = java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_YEAR)
         quotes[dayIndex % quotes.size]
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "“Discipline is choosing between what you want now and what you want most.”")
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "Discipline is choosing between what you want now and what you want most.")
 
     init {
         checkMidnightReset()
@@ -163,12 +163,36 @@ class GrindViewModel(private val repository: GrindRepository) : ViewModel() {
         }
     }
 
-    fun deleteCustomTask(task: Task) {
+    fun deleteTask(task: Task) {
         viewModelScope.launch {
             try {
-                repository.deleteCustomTask(task)
+                repository.deleteTask(task)
             } catch (e: Exception) {
-                Log.e("GrindViewModel", "Failed deleteCustomTask", e)
+                Log.e("GrindViewModel", "Failed deleteTask", e)
+            }
+        }
+    }
+
+    fun deleteCustomTask(task: Task) {
+        deleteTask(task)
+    }
+
+    fun updateTask(task: Task, name: String, category: String) {
+        viewModelScope.launch {
+            try {
+                repository.updateTask(task, name, category)
+            } catch (e: Exception) {
+                Log.e("GrindViewModel", "Failed updateTask", e)
+            }
+        }
+    }
+
+    fun reorderTasks(tasks: List<Task>) {
+        viewModelScope.launch {
+            try {
+                repository.reorderTasks(tasks)
+            } catch (e: Exception) {
+                Log.e("GrindViewModel", "Failed reorderTasks", e)
             }
         }
     }

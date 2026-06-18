@@ -10,6 +10,7 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import com.google.firebase.firestore.firestore
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.Firebase
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
@@ -68,7 +69,8 @@ class GrindRepository(private val db: AppDatabase) {
     suspend fun prepopulateDefaultTasks() = withContext(Dispatchers.IO) {
         // Only prepopulate if tasks are empty
         val list = taskDao.getTasksList()
-        if (list.isEmpty()) {
+        val profileExists = userProfileDao.getUserProfile() != null
+        if (list.isEmpty() && !profileExists) {
             val defaultTasks = listOf(
                 Task(name = "LeetCode Problem of the Day", category = "tech"),
                 Task(name = "Striver's DSA Exercise", category = "tech"),
@@ -77,8 +79,10 @@ class GrindRepository(private val db: AppDatabase) {
                 Task(name = "Complete PM Skincare routine", category = "health"),
                 Task(name = "Read Tech or Subject Books (30m)", category = "tech"),
                 Task(name = "Perform Daily Routine check", category = "discipline")
-            )
+            ).mapIndexed { index, task -> task.copy(sortOrder = index) }
             taskDao.insertAll(defaultTasks)
+        } else {
+            normalizeTaskSortOrderIfNeeded(list)
         }
     }
 
@@ -109,9 +113,15 @@ class GrindRepository(private val db: AppDatabase) {
             
             // 1. Process tasks for streak handling
             val currentTasks = taskDao.getTasksList()
-            var graceDaysUsedIncrement = 0
-            var allowedGrace = profile.graceDaysAllowedThisWeek
-            var graceUsedNow = profile.graceDaysUsedThisWeek
+            val graceUsedAtStart = if (isNewWeek(profile.lastResetDateString, today)) {
+                0
+            } else {
+                profile.graceDaysUsedThisWeek
+            }
+            val missedAnyTask = currentTasks.any { !it.isCompleted }
+            val usesGraceDay = missedAnyTask && graceUsedAtStart < profile.graceDaysAllowedThisWeek
+            val graceUsedNow = graceUsedAtStart + if (usesGraceDay) 1 else 0
+            val wasPerfectDay = currentTasks.isNotEmpty() && currentTasks.all { it.isCompleted }
 
             val updatedTasks = currentTasks.map { task ->
                 if (task.isCompleted) {
@@ -123,9 +133,8 @@ class GrindRepository(private val db: AppDatabase) {
                     )
                 } else {
                     // Task was NOT completed!
-                    // Check if we can use a grace day to save the streak
-                    if (allowedGrace > graceUsedNow) {
-                        graceUsedNow += 1
+                    // Check if today's one grace day can save all missed streaks.
+                    if (usesGraceDay) {
                         task.copy(
                             isCompleted = false,
                             // Streak stays, but marked as grace used
@@ -146,10 +155,16 @@ class GrindRepository(private val db: AppDatabase) {
             prepopulateDefaultHabitsForToday()
 
             // Update user profile with reset
+            val longestTaskStreak = updatedTasks.maxOfOrNull { it.streak } ?: 0
             val newProfile = profile.copy(
                 lastResetDateString = today,
                 graceDaysUsedThisWeek = graceUsedNow,
-                routineStreak = if (updatedTasks.all { !it.isCustom || it.isCompleted }) profile.routineStreak + 1 else 0
+                routineStreak = when {
+                    wasPerfectDay -> profile.routineStreak + 1
+                    usesGraceDay -> profile.routineStreak
+                    else -> 0
+                },
+                longestStreak = maxOf(profile.longestStreak, longestTaskStreak)
             )
             userProfileDao.insertOrUpdate(newProfile)
 
@@ -161,14 +176,37 @@ class GrindRepository(private val db: AppDatabase) {
     }
 
     suspend fun createCustomTask(name: String, category: String) = withContext(Dispatchers.IO) {
-        val task = Task(name = name, category = category, isCompleted = false, isCustom = true)
+        val task = Task(
+            name = name,
+            category = category,
+            isCompleted = false,
+            isCustom = true,
+            sortOrder = taskDao.getMaxSortOrder() + 1
+        )
         taskDao.insertTask(task)
     }
 
-    suspend fun deleteCustomTask(task: Task) = withContext(Dispatchers.IO) {
-        if (task.isCustom) {
-            taskDao.deleteTask(task)
-        }
+    suspend fun deleteTask(task: Task) = withContext(Dispatchers.IO) {
+        taskDao.deleteTask(task)
+        normalizeTaskSortOrderIfNeeded(taskDao.getTasksList())
+        syncLocalToLeaderboard()
+    }
+
+    suspend fun deleteCustomTask(task: Task) {
+        deleteTask(task)
+    }
+
+    suspend fun updateTask(task: Task, name: String, category: String) = withContext(Dispatchers.IO) {
+        val trimmedName = name.trim()
+        if (trimmedName.isBlank()) return@withContext
+        taskDao.insertTask(task.copy(name = trimmedName, category = category))
+        syncLocalToLeaderboard()
+    }
+
+    suspend fun reorderTasks(orderedTasks: List<Task>) = withContext(Dispatchers.IO) {
+        if (orderedTasks.isEmpty()) return@withContext
+        taskDao.insertAll(orderedTasks.mapIndexed { index, task -> task.copy(sortOrder = index) })
+        syncLocalToLeaderboard()
     }
 
     suspend fun toggleTaskCompletion(task: Task, isCompleted: Boolean) = withContext(Dispatchers.IO) {
@@ -349,11 +387,12 @@ class GrindRepository(private val db: AppDatabase) {
 
     suspend fun logTechStudy(topic: String, platform: String, count: Int) = withContext(Dispatchers.IO) {
         val today = getTodayDateString()
-        val xpEarned = 15 // +15 XP for logging a learning session
+        val loggedCount = count.coerceAtLeast(1)
+        val xpEarned = loggedCount * 15
         val log = TechLog(
             topic = topic,
             platform = platform,
-            count = count,
+            count = loggedCount,
             dateString = today,
             xpEarned = xpEarned
         )
@@ -382,6 +421,7 @@ class GrindRepository(private val db: AppDatabase) {
     }
 
     suspend fun saveDailyHabits(habits: DailyHabits) = withContext(Dispatchers.IO) {
+        val previousHabits = dailyHabitsDao.getHabitsForDate(habits.dateString)
         dailyHabitsDao.insertOrUpdate(habits)
 
         // Sync habits back to tasks if it's for today
@@ -402,8 +442,9 @@ class GrindRepository(private val db: AppDatabase) {
 
         // Recalculate streak / Award bonus XP
         val profile = getOrCreateUserProfile()
-        val isPerfect = habits.gymCompleted && habits.dietCompleted && habits.skincareCompleted && habits.sleepCompleted
-        if (isPerfect) {
+        val isPerfect = isCoreHealthPerfect(habits)
+        val wasAlreadyPerfect = previousHabits?.let { isCoreHealthPerfect(it) } == true
+        if (isPerfect && !wasAlreadyPerfect) {
             userProfileDao.insertOrUpdate(profile.copy(xp = profile.xp + 5))
             pushUserProfileToFirestore()
         }
@@ -427,6 +468,66 @@ class GrindRepository(private val db: AppDatabase) {
         }
     }
 
+    private fun normalizeSquadLookup(value: String): String {
+        return value
+            .trim()
+            .lowercase(Locale.US)
+            .replace(Regex("""[^a-z0-9]+"""), "")
+    }
+
+    private fun squadNamePartFromId(id: String): String {
+        return id
+            .removePrefix("hub-")
+            .replace(Regex("""-\d{3,}$"""), "")
+    }
+
+    private fun chooseBestSquadDocument(documents: List<DocumentSnapshot>): DocumentSnapshot? {
+        return documents
+            .sortedWith(
+                compareByDescending<DocumentSnapshot> { it.id.startsWith("hub-", ignoreCase = true) }
+                    .thenByDescending { it.getLong("lastSyncTime") ?: 0L }
+            )
+            .firstOrNull()
+    }
+
+    private suspend fun resolveExistingSquadId(input: String): String = withContext(Dispatchers.IO) {
+        val extracted = extractSquadId(input)
+        if (extracted.isBlank()) return@withContext extracted
+        if (extracted.startsWith("hub-", ignoreCase = true)) {
+            return@withContext extracted.lowercase(Locale.US)
+        }
+
+        val normalizedInput = normalizeSquadLookup(extracted)
+        try {
+            val squads = Firebase.firestore.collection("squads")
+
+            val exactNameMatches = squads
+                .whereEqualTo("name", extracted)
+                .get()
+                .await()
+                .documents
+            chooseBestSquadDocument(exactNameMatches)?.let { return@withContext it.id }
+
+            val allSquads = squads.get().await().documents
+            val nameMatches = allSquads.filter { doc ->
+                normalizeSquadLookup(doc.getString("name").orEmpty()) == normalizedInput
+            }
+            chooseBestSquadDocument(nameMatches)?.let { return@withContext it.id }
+
+            val idMatches = allSquads.filter { doc ->
+                normalizeSquadLookup(squadNamePartFromId(doc.id)) == normalizedInput
+            }
+            chooseBestSquadDocument(idMatches)?.let { return@withContext it.id }
+
+            val exactIdDoc = squads.document(extracted).get().await()
+            if (exactIdDoc.exists()) return@withContext exactIdDoc.id
+        } catch (e: Exception) {
+            Log.e("GrindRepository", "Failed resolving squad id for $input", e)
+        }
+
+        extracted
+    }
+
     suspend fun getGroupNameFromFirestore(groupId: String): String? = withContext(Dispatchers.IO) {
         try {
             val doc = Firebase.firestore.collection("squads").document(groupId).get().await()
@@ -437,17 +538,24 @@ class GrindRepository(private val db: AppDatabase) {
     }
 
     suspend fun joinGroup(groupIdInput: String, groupNameInput: String) = withContext(Dispatchers.IO) {
-        val cleanGroupId = extractSquadId(groupIdInput)
+        val cleanGroupId = resolveExistingSquadId(groupIdInput)
+        val remoteName = getGroupNameFromFirestore(cleanGroupId)
         
         var finalGroupName = groupNameInput.trim()
-        if (finalGroupName.contains("/") || finalGroupName.isBlank() || finalGroupName == cleanGroupId) {
-            val remoteName = getGroupNameFromFirestore(cleanGroupId)
-            finalGroupName = remoteName ?: "Squad Tribe"
+        if (
+            remoteName != null ||
+            finalGroupName.contains("/") ||
+            finalGroupName.isBlank() ||
+            finalGroupName.equals(cleanGroupId, ignoreCase = true) ||
+            finalGroupName.equals(groupIdInput.trim(), ignoreCase = true)
+        ) {
+            finalGroupName = remoteName ?: finalGroupName.ifBlank { "Squad Tribe" }
         }
         
         val profile = getOrCreateUserProfile()
         val updated = profile.copy(currentGroupId = cleanGroupId, currentGroupName = finalGroupName)
         userProfileDao.insertOrUpdate(updated)
+        groupMemberDao.deleteAll()
         pushUserProfileToFirestore()
 
         // Real sync from Firestore
@@ -515,12 +623,26 @@ class GrindRepository(private val db: AppDatabase) {
 
     suspend fun syncSquadMembers(groupId: String) = withContext(Dispatchers.IO) {
         try {
+            val cleanGroupId = resolveExistingSquadId(groupId)
+            val currentProfile = userProfileDao.getUserProfile()
+            if (currentProfile != null && currentProfile.currentGroupId != cleanGroupId) {
+                val remoteName = getGroupNameFromFirestore(cleanGroupId)
+                userProfileDao.insertOrUpdate(
+                    currentProfile.copy(
+                        currentGroupId = cleanGroupId,
+                        currentGroupName = remoteName ?: currentProfile.currentGroupName
+                    )
+                )
+                groupMemberDao.deleteAll()
+                pushUserProfileToFirestore()
+            }
+
             // 1. Always start by ensuring we are in the local leaderboard correctly
             syncLocalToLeaderboard()
 
             val snapshot = try {
                 Firebase.firestore.collection("squads")
-                    .document(groupId)
+                    .document(cleanGroupId)
                     .collection("members")
                     .get()
                     .await()
@@ -555,5 +677,34 @@ class GrindRepository(private val db: AppDatabase) {
 
     suspend fun clearAllData() = withContext(Dispatchers.IO) {
         db.clearAllTables()
+    }
+
+    private fun isCoreHealthPerfect(habits: DailyHabits): Boolean {
+        return habits.gymCompleted &&
+            habits.dietCompleted &&
+            habits.skincareCompleted &&
+            habits.sleepCompleted
+    }
+
+    private fun isNewWeek(previousDateString: String, currentDateString: String): Boolean {
+        if (previousDateString.isBlank()) return false
+        return try {
+            val format = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+            val previousDate = format.parse(previousDateString) ?: return false
+            val currentDate = format.parse(currentDateString) ?: return false
+            val previous = Calendar.getInstance().apply { time = previousDate }
+            val current = Calendar.getInstance().apply { time = currentDate }
+            previous.get(Calendar.YEAR) != current.get(Calendar.YEAR) ||
+                previous.get(Calendar.WEEK_OF_YEAR) != current.get(Calendar.WEEK_OF_YEAR)
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    private suspend fun normalizeTaskSortOrderIfNeeded(tasks: List<Task>) {
+        val needsNormalize = tasks.withIndex().any { (index, task) -> task.sortOrder != index }
+        if (needsNormalize) {
+            taskDao.insertAll(tasks.mapIndexed { index, task -> task.copy(sortOrder = index) })
+        }
     }
 }

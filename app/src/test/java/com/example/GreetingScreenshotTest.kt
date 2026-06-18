@@ -23,7 +23,7 @@ import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(qualifiers = RobolectricDeviceQualifiers.Pixel8, sdk = [36])
+@Config(qualifiers = RobolectricDeviceQualifiers.Pixel8, sdk = [35])
 class GreetingScreenshotTest {
 
   @get:Rule val composeTestRule = createComposeRule()
@@ -91,7 +91,7 @@ class GreetingScreenshotTest {
   fun testRenderProfile() {
     composeTestRule.setContent {
       MyApplicationTheme {
-        ProfileScreen(viewModel = viewModel)
+        ProfileScreen(viewModel = viewModel, onLogout = {})
       }
     }
     composeTestRule.waitForIdle()

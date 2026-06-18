@@ -1,35 +1,77 @@
 package com.example.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoStories
+import androidx.compose.material.icons.filled.Calculate
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Coffee
+import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Terminal
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.TechLog
 import com.example.ui.GrindViewModel
-import com.example.ui.theme.*
+import com.example.ui.theme.Background
+import com.example.ui.theme.Primary
+import com.example.ui.theme.TextMuted
+import com.example.ui.theme.TextPrimary
+import com.example.ui.theme.TextSecondary
+import com.example.ui.theme.animatedInt
+import com.example.ui.theme.fadeSlideIn
+import com.example.ui.theme.glassCard
+import com.example.ui.theme.pressScale
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
+private data class SubjectInfo(
+    val key: String,
+    val title: String,
+    val icon: ImageVector,
+    val target: Int
+)
+
+private val SubjectCatalog = listOf(
+    SubjectInfo("Problem Solving", "DSA", Icons.Default.AutoStories, 200),
+    SubjectInfo("Striver's DSA Sheet", "Striver", Icons.Default.MenuBook, 450),
+    SubjectInfo("Web Dev", "Web Dev", Icons.Default.Code, 100),
+    SubjectInfo("Python", "Python", Icons.Default.Terminal, 60),
+    SubjectInfo("Java", "Java", Icons.Default.Coffee, 60),
+    SubjectInfo("CRT", "CRT", Icons.Default.Calculate, 120)
+)
+
 @Composable
 fun TechScreen(
     viewModel: GrindViewModel,
@@ -37,310 +79,117 @@ fun TechScreen(
 ) {
     val techLogs by viewModel.techLogs.collectAsStateWithLifecycle()
 
-    val subjects = listOf("Problem Solving", "Web Dev", "Python", "Java", "CRT", "Striver's DSA Sheet")
-    val platforms = listOf("LeetCode", "CodeChef", "Smart Interviews", "Striver's Sheet")
+    var selectedSubject by remember { mutableStateOf(SubjectCatalog.first().key) }
+    var solvedCount by remember { mutableIntStateOf(3) }
 
-    var selectedSubject by remember { mutableStateOf(subjects[0]) }
-    var selectedPlatform by remember { mutableStateOf(platforms[0]) }
-    var countInput by remember { mutableStateOf("") }
-    var showSubjectDropdown by remember { mutableStateOf(false) }
-    var showPlatformDropdown by remember { mutableStateOf(false) }
-
-    val subjectTargets = remember {
-        mapOf(
-            "Problem Solving" to 200,
-            "Web Dev" to 100,
-            "Python" to 60,
-            "Java" to 60,
-            "CRT" to 120,
-            "Striver's DSA Sheet" to 450
-        )
+    val todayString = remember { SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date()) }
+    val weekStart = remember {
+        Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+            add(Calendar.DAY_OF_YEAR, -6)
+        }.time
     }
 
-    val subjectProgressMap = remember(techLogs) {
-        subjects.associateWith { subj ->
-            val totalLogCount = techLogs.filter { 
-                resolveSubject(it.topic, it.platform) == subj 
-            }.sumOf { it.count }
-            val target = (subjectTargets[subj] ?: 40).toFloat()
-            KeyValuePair(totalLogCount, (totalLogCount / target).coerceAtMost(1.0f))
+    val solvedBySubject = remember(techLogs) {
+        SubjectCatalog.associate { info ->
+            info.key to techLogs
+                .filter { resolveSubject(it.topic, it.platform) == info.key }
+                .sumOf { it.count }
         }
     }
+    val todaySolved = remember(techLogs, todayString) {
+        techLogs.filter { it.dateString == todayString }.sumOf { it.count }
+    }
+    val weekSolved = remember(techLogs, weekStart) {
+        val format = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        techLogs.filter { log ->
+            val parsed = runCatching { format.parse(log.dateString) }.getOrNull()
+            parsed != null && !parsed.before(weekStart)
+        }.sumOf { it.count }
+    }
+    val studyXp = remember(techLogs) { techLogs.sumOf { it.xpEarned } }
+    val selectedInfo = SubjectCatalog.firstOrNull { it.key == selectedSubject } ?: SubjectCatalog.first()
 
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
             .background(Color.Transparent)
-            .padding(horizontal = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(top = 24.dp, bottom = 90.dp)
+            .padding(horizontal = 22.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp),
+        contentPadding = PaddingValues(top = 8.dp, bottom = 104.dp)
     ) {
-        // Page Header
         item {
-            Column {
+            Column(modifier = Modifier.fadeSlideIn()) {
                 Text(
-                    text = "ACADEMY & CODING",
+                    text = "Academy",
                     style = MaterialTheme.typography.titleLarge.copy(
                         fontWeight = FontWeight.Bold,
-                        color = WarmAccentWhite
+                        color = TextPrimary,
+                        fontSize = 32.sp,
+                        letterSpacing = 0.sp
                     )
                 )
-                Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Log problems or topics study sessions. Earn 15 XP each.",
-                    style = MaterialTheme.typography.bodyMedium.copy(color = MutedWarmWhite)
+                    text = "Log study sessions and track progress.",
+                    style = MaterialTheme.typography.bodyMedium.copy(color = TextSecondary, fontSize = 14.sp)
                 )
             }
         }
 
-
-        // Subjects Progression
         item {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .glassCard(shape = RoundedCornerShape(16.dp))
-                    .padding(20.dp)
-            ) {
-                Column {
-                    Text(
-                        text = "SUBJECT PROGRESSION",
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            fontSize = 11.sp,
-                            color = MutedWarmWhite,
-                            letterSpacing = 1.1.sp
-                        )
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    subjects.forEach { subj ->
-                        val progressData = subjectProgressMap[subj] ?: KeyValuePair(0, 0f)
-                        Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = subj,
-                                    style = MaterialTheme.typography.bodyLarge.copy(
-                                        fontSize = 15.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = WarmAccentWhite
-                                    )
-                                )
-                                Text(
-                                    text = "${progressData.count} of ${subjectTargets[subj] ?: 40}",
-                                    style = MaterialTheme.typography.bodyMedium.copy(
-                                        fontSize = 13.sp,
-                                        color = MutedWarmWhite,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(8.dp))
-                            // Spec: Progress bars: 6px height, 8px radius, background rgba(255,255,255,0.08), fill color #f5f0e8
-                            LinearProgressIndicator(
-                                progress = { progressData.pct },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(6.dp)
-                                    .clip(RoundedCornerShape(8.dp)),
-                                color = WarmAccentWhite,
-                                trackColor = Color(0x14FFFFFF)
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // Log input form section (frosted glass card)
-        item {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .glassCard(shape = RoundedCornerShape(16.dp))
-                    .padding(20.dp)
-            ) {
-                Column {
-                    Text(
-                        text = "LOG NEW CODING ATTACK",
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            fontSize = 11.sp,
-                            color = MutedWarmWhite,
-                            letterSpacing = 1.1.sp
-                        )
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Subject Dropdown
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        ExposedDropdownMenuBox(
-                            expanded = showSubjectDropdown,
-                            onExpandedChange = { showSubjectDropdown = !showSubjectDropdown }
-                        ) {
-                            OutlinedTextField(
-                                value = selectedSubject,
-                                onValueChange = {},
-                                readOnly = true,
-                                label = { Text("Subject / Topic", color = TextGray) },
-                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showSubjectDropdown) },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .menuAnchor()
-                                    .testTag("tech_subject_input"),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = WarmAccentWhite,
-                                    unfocusedBorderColor = Color.White.copy(alpha = 0.1f),
-                                    focusedLabelColor = WarmAccentWhite,
-                                    unfocusedLabelColor = TextGray,
-                                    focusedTextColor = WarmAccentWhite,
-                                    unfocusedTextColor = WarmAccentWhite
-                                )
-                            )
-                            ExposedDropdownMenu(
-                                expanded = showSubjectDropdown,
-                                onDismissRequest = { showSubjectDropdown = false },
-                                modifier = Modifier
-                                    .background(SpaceBlack)
-                                    .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
-                            ) {
-                                subjects.forEach { subj ->
-                                    DropdownMenuItem(
-                                        text = { Text(subj, color = WarmAccentWhite) },
-                                        onClick = {
-                                            selectedSubject = subj
-                                            showSubjectDropdown = false
-                                        },
-                                        modifier = Modifier.background(SpaceBlack)
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Platform Dropdown
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        ExposedDropdownMenuBox(
-                            expanded = showPlatformDropdown,
-                            onExpandedChange = { showPlatformDropdown = !showPlatformDropdown }
-                        ) {
-                            OutlinedTextField(
-                                value = selectedPlatform,
-                                onValueChange = {},
-                                readOnly = true,
-                                label = { Text("Platform", color = TextGray) },
-                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showPlatformDropdown) },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .menuAnchor()
-                                    .testTag("tech_platform_input"),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = WarmAccentWhite,
-                                    unfocusedBorderColor = Color.White.copy(alpha = 0.1f),
-                                    focusedLabelColor = WarmAccentWhite,
-                                    unfocusedLabelColor = TextGray,
-                                    focusedTextColor = WarmAccentWhite,
-                                    unfocusedTextColor = WarmAccentWhite
-                                )
-                            )
-                            ExposedDropdownMenu(
-                                expanded = showPlatformDropdown,
-                                onDismissRequest = { showPlatformDropdown = false },
-                                modifier = Modifier
-                                    .background(SpaceBlack)
-                                    .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
-                            ) {
-                                platforms.forEach { plat ->
-                                    DropdownMenuItem(
-                                        text = { Text(plat, color = WarmAccentWhite) },
-                                        onClick = {
-                                            selectedPlatform = plat
-                                            showPlatformDropdown = false
-                                        },
-                                        modifier = Modifier.background(SpaceBlack)
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Count Input
-                    OutlinedTextField(
-                        value = countInput,
-                        onValueChange = { countInput = it },
-                        label = { Text("Problems or Modules Solved", color = TextGray) },
-                        placeholder = { Text("e.g. 3", color = TextGray.copy(alpha = 0.3f)) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("tech_count_input"),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = WarmAccentWhite,
-                            unfocusedBorderColor = Color.White.copy(alpha = 0.1f),
-                            focusedLabelColor = WarmAccentWhite,
-                            unfocusedLabelColor = TextGray,
-                            focusedTextColor = WarmAccentWhite,
-                            unfocusedTextColor = WarmAccentWhite
-                        )
-                    )
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    // Submit Button via GrindButton
-                    GrindButton(
-                        text = "LOG WORK & EARN +15 XP",
-                        onClick = {
-                            val count = countInput.trim().toIntOrNull() ?: 1
-                            viewModel.addTechLog(selectedSubject, selectedPlatform, count)
-                            countInput = ""
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("submit_log_btn")
-                    )
-                }
-            }
-        }
-
-        // Log History title
-        item {
-            Text(
-                text = "LOG HISTORY",
-                style = MaterialTheme.typography.labelMedium.copy(
-                    fontSize = 11.sp,
-                    color = MutedWarmWhite,
-                    letterSpacing = 1.1.sp
-                ),
-                modifier = Modifier.padding(top = 12.dp)
+            StudySummaryCard(
+                todaySolved = todaySolved,
+                weekSolved = weekSolved,
+                studyXp = studyXp
             )
         }
 
-        // History logs lists
-        if (techLogs.isEmpty()) {
-            item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(24.dp),
-                    contentAlignment = Alignment.Center
-                ) {
+        item {
+            LogStudyCard(
+                selectedSubject = selectedSubject,
+                onSubjectSelected = { selectedSubject = it },
+                selectedTitle = selectedInfo.title,
+                count = solvedCount,
+                onCountChange = { solvedCount = it.coerceIn(1, 12) },
+                onCommit = {
+                    viewModel.addTechLog(selectedSubject, defaultPlatformFor(selectedSubject), solvedCount)
+                }
+            )
+        }
+
+        item {
+            SectionTitle("Subject progress")
+        }
+
+        item {
+            SubjectProgressList(solvedBySubject = solvedBySubject)
+        }
+
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SectionTitle("Recent sessions")
+                if (techLogs.isNotEmpty()) {
                     Text(
-                        text = "No technical study logs recorded yet today.",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            color = MutedWarmWhite,
-                            fontSize = 13.sp
-                        )
+                        text = "${techLogs.size} logged",
+                        style = MaterialTheme.typography.labelSmall.copy(color = TextMuted, fontSize = 11.sp)
                     )
                 }
             }
+        }
+
+        if (techLogs.isEmpty()) {
+            item {
+                EmptySessionsCard()
+            }
         } else {
-            items(techLogs) { log ->
+            items(techLogs.take(10), key = { it.id }) { log ->
                 TechLogItemRow(log = log)
             }
         }
@@ -348,262 +197,445 @@ fun TechScreen(
 }
 
 @Composable
-fun TechLogItemRow(log: TechLog) {
-    Column {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.Code,
-                    contentDescription = "Code icon",
-                    tint = MutedWarmWhite,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                    Text(
-                        text = log.topic,
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = WarmAccentWhite
-                        )
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = "${log.platform} • ${log.count} problems finished",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontSize = 11.sp,
-                            color = MutedWarmWhite
-                        )
-                    )
-                }
-            }
-
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    text = "+${log.xpEarned} XP",
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        fontSize = 13.sp,
-                        color = WarmAccentWhite,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = log.dateString,
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        fontSize = 11.sp,
-                        color = MutedWarmWhite
-                    )
-                )
-            }
-        }
-        HorizontalDivider(thickness = 0.5.dp, color = Color(0x14FFFFFF))
+private fun StudySummaryCard(
+    todaySolved: Int,
+    weekSolved: Int,
+    studyXp: Int
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .glassCard(shape = RoundedCornerShape(24.dp))
+            .padding(vertical = 20.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        AcademyStat("Today", "${animatedInt(todaySolved)}")
+        StatDivider()
+        AcademyStat("Week", "${animatedInt(weekSolved)}")
+        StatDivider()
+        AcademyStat("Study XP", "${animatedInt(studyXp)}")
     }
 }
 
-data class KeyValuePair(val count: Int, val pct: Float)
+@Composable
+private fun AcademyStat(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleLarge.copy(
+                color = Primary,
+                fontWeight = FontWeight.Bold,
+                fontSize = 24.sp
+            )
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(
+            text = label.uppercase(Locale.US),
+            style = MaterialTheme.typography.labelSmall.copy(
+                color = TextMuted,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold
+            )
+        )
+    }
+}
 
-private fun resolveSubject(topic: String, platform: String): String {
-    val topicLower = topic.lowercase(java.util.Locale.getDefault()).trim()
-    val platformLower = platform.lowercase(java.util.Locale.getDefault()).trim()
+@Composable
+private fun StatDivider() {
+    Box(
+        modifier = Modifier
+            .height(34.dp)
+            .width(1.dp)
+            .background(Color.White.copy(alpha = 0.07f))
+    )
+}
 
-    return when {
-        // 1. Striver's DSA Sheet
-        topicLower.contains("striver") || platformLower.contains("striver") || platformLower.contains("sheet") -> "Striver's DSA Sheet"
-        
-        // 2. CRT
-        topicLower.contains("crt") || 
-        topicLower.contains("smart") || 
-        topicLower.contains("interview") || 
-        platformLower.contains("smart") || 
-        platformLower.contains("interview") -> "CRT"
-        
-        // 3. Web Dev
-        topicLower.contains("web") || 
-        topicLower.contains("html") || 
-        topicLower.contains("css") || 
-        topicLower.contains("js") || 
-        topicLower.contains("javascript") || 
-        topicLower.contains("react") || 
-        topicLower.contains("node") || 
-        platformLower.contains("web") -> "Web Dev"
-        
-        // 4. Python
-        topicLower.contains("python") || 
-        topicLower.contains("django") || 
-        topicLower.contains("flask") || 
-        topicLower.contains("numpy") || 
-        topicLower.contains("pandas") || 
-        topicLower.contains("py") -> "Python"
-        
-        // 5. Java
-        topicLower.contains("java") && !topicLower.contains("javascript") && !topicLower.contains("js") -> "Java"
-        
-        // 6. Problem Solving (Default, or if matches LeetCode, CodeChef, etc.)
-        topicLower.contains("problem") || 
-        topicLower.contains("solving") || 
-        topicLower.contains("dsa") || 
-        topicLower.contains("leetcode") || 
-        topicLower.contains("codechef") || 
-        platformLower.contains("leetcode") || 
-        platformLower.contains("codechef") -> "Problem Solving"
-        
-        // Match exact subject names case-insensitively
-        else -> {
-            val matchedSubject = listOf("Problem Solving", "Web Dev", "Python", "Java", "CRT", "Striver's DSA Sheet")
-                .firstOrNull { it.equals(topicLower, ignoreCase = true) }
-            matchedSubject ?: "Problem Solving" // Default to Problem Solving
+@Composable
+private fun LogStudyCard(
+    selectedSubject: String,
+    onSubjectSelected: (String) -> Unit,
+    selectedTitle: String,
+    count: Int,
+    onCountChange: (Int) -> Unit,
+    onCommit: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .glassCard(shape = RoundedCornerShape(24.dp))
+            .padding(18.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Text(
+            text = "Log study",
+            style = MaterialTheme.typography.titleMedium.copy(
+                color = TextPrimary,
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp
+            )
+        )
+
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = "Subject",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    color = TextMuted,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            )
+            SubjectChipGrid(
+                selectedSubject = selectedSubject,
+                onSubjectSelected = onSubjectSelected
+            )
+        }
+
+        HorizontalDivider(thickness = 0.5.dp, color = Color.White.copy(alpha = 0.06f))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            StepperButton(icon = Icons.Default.Remove, enabled = count > 1) {
+                onCountChange(count - 1)
+            }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "$count",
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        color = Primary,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 48.sp
+                    )
+                )
+                Text(
+                    text = if (count == 1) "problem" else "problems",
+                    style = MaterialTheme.typography.bodyMedium.copy(color = TextSecondary, fontSize = 12.sp)
+                )
+            }
+            StepperButton(icon = Icons.Default.Add, enabled = count < 12) {
+                onCountChange(count + 1)
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(54.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(Primary)
+                .pressScale(onClick = onCommit)
+                .testTag("submit_log_btn"),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "Log $selectedTitle  +${count * 15} XP",
+                style = MaterialTheme.typography.labelMedium.copy(
+                    color = Background,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
+                )
+            )
         }
     }
 }
 
 @Composable
-fun PomodoroTimerWidget(
-    onSessionFinished: (Int) -> Unit
+private fun SubjectChipGrid(
+    selectedSubject: String,
+    onSubjectSelected: (String) -> Unit
 ) {
-    var timerPreset by remember { mutableIntStateOf(25) }
-    var timerSeconds by remember { mutableIntStateOf(25 * 60) }
-    var timerActive by remember { mutableStateOf(false) }
-
-    LaunchedEffect(timerActive, timerSeconds) {
-        if (timerActive && timerSeconds > 0) {
-            kotlinx.coroutines.delay(1000)
-            timerSeconds -= 1
-        } else if (timerActive && timerSeconds == 0) {
-            timerActive = false
-            onSessionFinished(timerPreset)
-            timerSeconds = timerPreset * 60
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SubjectCatalog.chunked(3).forEach { rowItems ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                rowItems.forEach { subject ->
+                    SubjectChip(
+                        subject = subject,
+                        selected = subject.key == selectedSubject,
+                        onClick = { onSubjectSelected(subject.key) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                repeat(3 - rowItems.size) {
+                    Spacer(Modifier.weight(1f))
+                }
+            }
         }
     }
+}
 
-    val formatTime = remember(timerSeconds) {
-        val mins = timerSeconds / 60
-        val secs = timerSeconds % 60
-        String.format(java.util.Locale.US, "%02d:%02d", mins, secs)
+@Composable
+private fun SubjectChip(
+    subject: SubjectInfo,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val bg by animateColorAsState(
+        targetValue = if (selected) Primary.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.04f),
+        animationSpec = tween(180),
+        label = "subjectChipBg"
+    )
+    val border by animateColorAsState(
+        targetValue = if (selected) Primary.copy(alpha = 0.36f) else Color.Transparent,
+        animationSpec = tween(180),
+        label = "subjectChipBorder"
+    )
+    val tint by animateColorAsState(
+        targetValue = if (selected) Primary else TextSecondary,
+        animationSpec = tween(180),
+        label = "subjectChipTint"
+    )
+
+    Row(
+        modifier = modifier
+            .height(42.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(bg)
+            .border(1.dp, border, RoundedCornerShape(12.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 10.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(subject.icon, contentDescription = null, tint = tint, modifier = Modifier.size(15.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text = subject.title,
+            style = MaterialTheme.typography.labelSmall.copy(
+                color = tint,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                fontSize = 11.sp
+            ),
+            maxLines = 1
+        )
     }
+}
 
+@Composable
+private fun StepperButton(
+    icon: ImageVector,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .size(46.dp)
+            .clip(CircleShape)
+            .background(Primary.copy(alpha = if (enabled) 0.12f else 0.04f))
+            .border(1.dp, Primary.copy(alpha = if (enabled) 0.28f else 0.08f), CircleShape)
+            .pressScale(scaleDown = 0.92f, enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = if (enabled) Primary else TextMuted,
+            modifier = Modifier.size(21.dp)
+        )
+    }
+}
+
+@Composable
+private fun SectionTitle(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.titleSmall.copy(
+            color = TextPrimary,
+            fontWeight = FontWeight.Bold,
+            fontSize = 16.sp
+        )
+    )
+}
+
+@Composable
+private fun SubjectProgressList(solvedBySubject: Map<String, Int>) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .glassCard(shape = RoundedCornerShape(20.dp))
+            .padding(8.dp)
+    ) {
+        SubjectCatalog.forEachIndexed { index, subject ->
+            SubjectProgressRow(subject = subject, solved = solvedBySubject[subject.key] ?: 0)
+            if (index < SubjectCatalog.lastIndex) {
+                HorizontalDivider(
+                    thickness = 0.5.dp,
+                    color = Color.White.copy(alpha = 0.05f),
+                    modifier = Modifier.padding(horizontal = 12.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SubjectProgressRow(subject: SubjectInfo, solved: Int) {
+    val progress = (solved.toFloat() / subject.target).coerceIn(0f, 1f)
+    val animatedProgress by animateFloatAsState(
+        targetValue = progress,
+        animationSpec = tween(400),
+        label = "subjectProgress"
+    )
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .background(Primary.copy(alpha = 0.12f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(subject.icon, contentDescription = null, tint = Primary, modifier = Modifier.size(16.dp))
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = subject.title,
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        color = TextPrimary,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp
+                    )
+                )
+                Text(
+                    text = "$solved/${subject.target}",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        color = TextSecondary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(5.dp)
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(Color.White.copy(alpha = 0.07f))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(animatedProgress)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(Primary)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptySessionsCard() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .glassCard(shape = RoundedCornerShape(16.dp))
-            .padding(24.dp)
+            .glassCard(shape = RoundedCornerShape(20.dp))
+            .padding(vertical = 28.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.fillMaxWidth()
-        ) {
+        Text(
+            text = "No sessions yet. Log your first one above.",
+            style = MaterialTheme.typography.bodyMedium.copy(color = TextSecondary, fontSize = 13.sp)
+        )
+    }
+}
+
+@Composable
+fun TechLogItemRow(log: TechLog) {
+    val subject = resolveSubject(log.topic, log.platform)
+    val info = SubjectCatalog.firstOrNull { it.key == subject } ?: SubjectCatalog.first()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .glassCard(shape = RoundedCornerShape(16.dp))
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .background(Primary.copy(alpha = 0.12f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(info.icon, contentDescription = null, tint = Primary, modifier = Modifier.size(17.dp))
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = info.title,
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextPrimary
+                    ),
+                    maxLines = 1
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = "${log.count} solved",
+                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 11.sp, color = TextSecondary),
+                    maxLines = 1
+                )
+            }
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(horizontalAlignment = Alignment.End) {
             Text(
-                text = "GRIND POMODORO TIMER",
-                style = MaterialTheme.typography.labelMedium.copy(
-                    fontSize = 11.sp,
-                    color = MutedWarmWhite,
-                    letterSpacing = 1.1.sp
+                text = "+${log.xpEarned} XP",
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    fontSize = 13.sp,
+                    color = Primary,
+                    fontWeight = FontWeight.Bold
                 )
             )
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(Modifier.height(2.dp))
             Text(
-                text = formatTime,
-                style = TextStyle(
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 48.sp,
-                    color = WarmAccentWhite,
-                    letterSpacing = 2.sp
-                ),
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                text = log.dateString,
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 10.sp, color = TextMuted)
             )
-            Spacer(modifier = Modifier.height(16.dp))
+        }
+    }
+}
 
-            // Preset selectors
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                listOf(15, 25, 45, 60).forEach { mins ->
-                    val isSelected = timerPreset == mins
-                    Box(
-                        modifier = Modifier
-                            .background(
-                                color = if (isSelected) TechPillBg else Color.Transparent,
-                                shape = RoundedCornerShape(6.dp)
-                              )
-                            .border(
-                                width = 1.dp,
-                                color = if (isSelected) OrangerRed else Color.White.copy(alpha = 0.08f),
-                                shape = RoundedCornerShape(6.dp)
-                            )
-                            .clickable {
-                                timerPreset = mins
-                                timerSeconds = mins * 60
-                                timerActive = false
-                            }
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Text(
-                            text = "${mins}m",
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                color = if (isSelected) OrangerRed else WarmAccentWhite,
-                                fontWeight = FontWeight.Bold
-                            )
-                        )
-                    }
-                }
-            }
+private fun defaultPlatformFor(subject: String): String = when (subject) {
+    "Problem Solving" -> "LeetCode"
+    "Striver's DSA Sheet" -> "Striver's Sheet"
+    "CRT" -> "Smart Interviews"
+    "Web Dev" -> "Web Dev"
+    "Python" -> "Python"
+    "Java" -> "Java"
+    else -> "Study"
+}
 
-            Spacer(modifier = Modifier.height(20.dp))
+private fun resolveSubject(topic: String, platform: String): String {
+    val topicLower = topic.lowercase(Locale.US).trim()
+    val platformLower = platform.lowercase(Locale.US).trim()
 
-            // Actions
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(52.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(WarmAccentWhite)
-                        .clickable { timerActive = !timerActive },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = if (timerActive) "PAUSE" else "START",
-                        style = TextStyle(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            color = SpaceBlack
-                        )
-                    )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .height(52.dp)
-                        .glassCard(shape = RoundedCornerShape(10.dp))
-                        .clickable {
-                            timerActive = false
-                            timerSeconds = timerPreset * 60
-                        }
-                        .padding(horizontal = 20.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "RESET",
-                        style = TextStyle(
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 15.sp,
-                            color = WarmAccentWhite
-                        )
-                    )
-                }
-            }
+    return when {
+        topicLower.contains("striver") || platformLower.contains("striver") || platformLower.contains("sheet") -> "Striver's DSA Sheet"
+        topicLower.contains("crt") || topicLower.contains("smart") || topicLower.contains("interview") || platformLower.contains("smart") || platformLower.contains("interview") -> "CRT"
+        topicLower.contains("web") || topicLower.contains("html") || topicLower.contains("css") || topicLower.contains("js") || topicLower.contains("javascript") || topicLower.contains("react") || topicLower.contains("node") || platformLower.contains("web") -> "Web Dev"
+        topicLower.contains("python") || topicLower.contains("django") || topicLower.contains("flask") || topicLower.contains("numpy") || topicLower.contains("pandas") || topicLower.contains("py") || platformLower.contains("python") -> "Python"
+        (topicLower.contains("java") && !topicLower.contains("javascript") && !topicLower.contains("js")) || platformLower.contains("java") -> "Java"
+        topicLower.contains("problem") || topicLower.contains("solving") || topicLower.contains("dsa") || topicLower.contains("leetcode") || topicLower.contains("codechef") || platformLower.contains("leetcode") || platformLower.contains("codechef") -> "Problem Solving"
+        else -> {
+            SubjectCatalog.firstOrNull { it.key.equals(topic, ignoreCase = true) || it.title.equals(topic, ignoreCase = true) }?.key
+                ?: "Problem Solving"
         }
     }
 }

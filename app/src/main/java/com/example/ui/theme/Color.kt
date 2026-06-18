@@ -2,35 +2,63 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// GrindStack Warm Minimal Theme Colors
-val SpaceBlack = Color(0xFF111008) // #111008
-val CardBg = Color(0x0DFFFFFF)      // rgba(255, 255, 255, 0.03)
-val CardBorder = Color(0x12FFFFFF)  // rgba(255, 255, 255, 0.07)
+/**
+ * GrindStack palette — true black canvas, one confident lime accent, white type.
+ * Disciplined and premium: a single hue does all the work (no multi-colour gradients).
+ * Every legacy name is kept and re-pointed so the whole app re-skins from this file.
+ */
 
-// Text Colors
-val TextPrimary = Color(0xFFF5F0E8)   // #f5f0e8
-val TextSecondary = Color(0xFF9A948A) // #9a948a
-val TextMuted = Color(0xFF5E5A53)     // #5e5a53
+// ---- Canvas & surfaces ----------------------------------------------------
+val Background = Color(0xFF000000)        // true black
+val Surface = Color(0xFF000000)
+val SurfaceContainer = Color(0xFF161616)  // dark-grey card on black
+val SurfaceVariant = Color(0xFF1F1F1F)
+val OutlineVariant = Color(0x12FFFFFF)
+val Outline = Color(0x1AFFFFFF)
 
-// Accent Colors
-val AccentOrange = Color(0xFFFB923C) // #fb923c
-val AccentGreen = Color(0xFF4ADE80)  // #4ade80
-val AccentPurple = Color(0xFFA78BFA) // #a78bfa
-val AccentBlue = Color(0xFF60A5FA)   // #60a5fa
+// ---- Text -----------------------------------------------------------------
+val TextPrimary = Color(0xFFF5F5F7)       // soft white
+val TextSecondary = Color(0xFF9A9AA2)     // grey
+val TextMuted = Color(0xFF636368)         // muted grey
 
-// Legacy support (to avoid breaks)
+// ---- Accent (single hue) --------------------------------------------------
+val Lime = Color(0xFFC9F24C)              // the one accent
+val LimeDim = Color(0xFFA8CC3E)           // pressed / dimmer lime
+val Primary = Lime
+val Secondary = Lime
+val Tertiary = Lime
+val AuroraCyan = Lime                     // re-pointed (no second hue)
+val AuroraEmerald = Lime                  // success / health = same lime
+
+// Gradient stops kept for source compatibility — all lime, so no rainbow.
+val AuroraStart = Lime
+val AuroraMid = Lime
+val AuroraEnd = LimeDim
+
+// ---- Functional -----------------------------------------------------------
+val Danger = Color(0xFFFF453A)            // destructive only (delete)
+
+// ---- Legacy aliases (kept so existing screens compile, re-pointed) --------
+val SpaceBlack = Background
+val CardBg = Color(0x0AFFFFFF)            // soft 4% white fill
+val CardBorder = Color(0x0FFFFFFF)        // barely-there 6%
 val WarmAccentWhite = TextPrimary
-val MutedWarmWhite = Color(0x73F5F0E8)
-val TextGray = TextSecondary
-val CyberGreen = AccentGreen
-val CyberPurple = AccentPurple
-val TechPillBg = Color(0x1AFB923C) // rgba(251, 146, 60, 0.1)
-val TechPillText = AccentOrange
-val HealthPillBg = Color(0x1A4ADE80) // rgba(74, 222, 128, 0.1)
-val HealthPillText = AccentGreen
-val DisciplinePillBg = Color(0x1AA78BFA) // rgba(167, 139, 250, 0.1)
-val DisciplinePillText = AccentPurple
+val MutedWarmWhite = TextSecondary
+val TextGray = TextMuted
+val CyberGreen = Lime
+val CyberPurple = Lime
+val AccentOrange = Lime
+val AccentGreen = Lime
+val AccentPurple = Lime
+val AccentBlue = Lime
 
-val OrangerRed = Color(0xFFFB923C)
-val MutedGreen = Color(0x804ADE80)
-val MutedPurple = Color(0x80A78BFA)
+val TechPillBg = Color(0x1FC9F24C)        // lime tint
+val TechPillText = Lime
+val HealthPillBg = Color(0x1FC9F24C)
+val HealthPillText = Lime
+val DisciplinePillBg = Color(0x1FC9F24C)
+val DisciplinePillText = Lime
+
+val OrangerRed = Danger
+val MutedGreen = Color(0x80C9F24C)
+val MutedPurple = Color(0x80C9F24C)

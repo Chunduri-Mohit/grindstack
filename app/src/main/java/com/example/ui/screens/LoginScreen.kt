@@ -4,6 +4,11 @@ import android.app.Activity
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -11,6 +16,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -167,11 +173,23 @@ fun LoginScreen(
             // Header Section
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fadeSlideIn()
             ) {
+                val logoPulse = rememberInfiniteTransition(label = "logoPulse")
+                val logoScale by logoPulse.animateFloat(
+                    initialValue = 1f,
+                    targetValue = 1.07f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(1600),
+                        repeatMode = RepeatMode.Reverse
+                    ),
+                    label = "logoScaleVal"
+                )
                 Box(
                     modifier = Modifier
                         .size(64.dp)
+                        .scale(logoScale)
                         .glassCard(shape = RoundedCornerShape(16.dp))
                         .background(Color(0x0AFFFFFF)),
                     contentAlignment = Alignment.Center
@@ -213,6 +231,7 @@ fun LoginScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .fadeSlideIn(delayMillis = 90)
                         .glassCard(shape = RoundedCornerShape(16.dp))
                         .padding(16.dp)
                 ) {
@@ -244,6 +263,7 @@ fun LoginScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .fadeSlideIn(delayMillis = 160)
                         .glassCard(shape = RoundedCornerShape(16.dp))
                         .padding(16.dp)
                 ) {
@@ -275,6 +295,7 @@ fun LoginScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .fadeSlideIn(delayMillis = 230)
                         .glassCard(shape = RoundedCornerShape(16.dp))
                         .padding(16.dp)
                 ) {

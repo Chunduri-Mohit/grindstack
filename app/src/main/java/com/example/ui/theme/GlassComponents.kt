@@ -3,8 +3,6 @@ package com.example.ui.theme
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
@@ -16,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -26,64 +25,73 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+/** Solid lime — the single accent. (Kept as a brush for source compatibility.) */
+fun auroraBrush() = Brush.linearGradient(listOf(Lime, Lime))
+
 /**
- * Applies a gorgeous solid minimal background matching the Warm Minimal Theme (#111008)
- * and paints dynamic orange & purple mesh glows.
+ * True-black backdrop with one barely-there lime glow in the upper area.
+ *
+ * Painted statically (no infinite animation). The old version reran a 14s transition
+ * that invalidated and redrew this full-screen gradient on every frame, forever —
+ * forcing the whole window to redraw even while idle and during scroll, which read as
+ * constant micro-jank. The drift was imperceptibly slow, so dropping it costs nothing
+ * visually and lets the background layer draw exactly once.
  */
-fun Modifier.glassBackground() = this.drawBehind {
-    // Solid warm dark base
-    drawRect(color = SpaceBlack)
-    
-    // Top-left subtle orange radial glow
+fun Modifier.animatedGlassBackground(): Modifier = this.background(Background)
+
+/**
+ * Borderless frosted surface — the default card. No hard outline (that was the boxy
+ * look); just a soft top-lit translucent fill with generously rounded corners.
+ */
+fun Modifier.glassCard(
+    shape: Shape = RoundedCornerShape(24.dp),
+    borderAlpha: Float = 0f // kept for source compatibility; borderless by design
+) = this
+    .clip(shape)
+    .background(Color.White.copy(alpha = 0.055f))
+
+/**
+ * Feature surface tinted by an accent, with an inner top glow. Used for hero/standout
+ * cards so they read as lit panels rather than outlined boxes.
+ */
+fun Modifier.auroraCard(
+    accent: Color = Primary,
+    shape: Shape = RoundedCornerShape(28.dp),
+    tint: Float = 0.16f
+) = this
+    .clip(shape)
+    .background(accent.copy(alpha = tint))
+
+/**
+ * Soft coloured glow painted *behind* an element — fakes a colored shadow for buttons,
+ * rings and badges. GPU-cheap (single radial gradient).
+ */
+fun Modifier.auroraGlow(
+    color: Color = Primary,
+    alpha: Float = 0.35f,
+    radiusScale: Float = 0.95f
+) = this.drawBehind {
+    val r = size.maxDimension * radiusScale
     drawCircle(
         brush = Brush.radialGradient(
-            colors = listOf(Color(0x0CFB923C), Color.Transparent),
-            center = androidx.compose.ui.geometry.Offset(size.width * 0.15f, size.height * 0.12f),
-            radius = size.minDimension * 0.65f
+            colors = listOf(color.copy(alpha = alpha), Color.Transparent),
+            center = center,
+            radius = r
         ),
-        center = androidx.compose.ui.geometry.Offset(size.width * 0.15f, size.height * 0.12f),
-        radius = size.minDimension * 0.65f
-    )
-    
-    // Bottom-right subtle purple radial glow
-    drawCircle(
-        brush = Brush.radialGradient(
-            colors = listOf(Color(0x0CA78BFA), Color.Transparent),
-            center = androidx.compose.ui.geometry.Offset(size.width * 0.85f, size.height * 0.85f),
-            radius = size.minDimension * 0.65f
-        ),
-        center = androidx.compose.ui.geometry.Offset(size.width * 0.85f, size.height * 0.85f),
-        radius = size.minDimension * 0.65f
+        radius = r,
+        center = center
     )
 }
 
-/**
- * Replaces cards with a warm minimal frosted glassmorphism panel.
- * Uses exact specs matching Web PWA:
- * - background: rgba(255, 255, 255, 0.03)
- * - border: 1px solid rgba(255, 255, 255, 0.07)
- * - border radius: 16dp everywhere (matching PWA soft corners)
- */
-fun Modifier.glassCard(
-    shape: Shape = RoundedCornerShape(16.dp),
-    borderAlpha: Float = 0.07f
-) = this
-    .clip(shape)
-    .background(Color(0x08FFFFFF)) // rgba(255, 255, 255, 0.03)
-    .border(
-        width = 1.dp,
-        color = Color.White.copy(alpha = borderAlpha), // rgba(255, 255, 255, 0.07)
-        shape = shape
-    )
+/** Tactile press-and-release scale for any element. */
+fun Modifier.pressable(
+    scaleDown: Float = 0.97f,
+    enabled: Boolean = true,
+    onClick: () -> Unit
+): Modifier = pressScale(scaleDown, enabled, onClick)
 
 /**
- * Custom modern solid action button styled as per PWA specifications:
- * - background: #f5f0e8 solid background
- * - text color: #111008 dark text
- * - corners: 10px (10.dp)
- * - height: 52px
- * - typography: 15px, semi-bold (600)
- * - dynamic pressed state scale down animation (0.97 with 100ms ease)
+ * Primary call-to-action: a glowing aurora gradient pill with a press response.
  */
 @Composable
 fun GrindButton(
@@ -102,17 +110,17 @@ fun GrindButton(
     Box(
         modifier = modifier
             .scale(scale)
-            .height(52.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(if (enabled) WarmAccentWhite else WarmAccentWhite.copy(alpha = 0.5f))
+            .auroraGlow(color = Lime, alpha = if (enabled) 0.22f else 0f, radiusScale = 0.6f)
+            .height(54.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(
+                if (enabled) auroraBrush()
+                else Brush.horizontalGradient(listOf(SurfaceVariant, SurfaceVariant))
+            )
             .pointerInput(enabled) {
                 if (enabled) {
                     detectTapGestures(
-                        onPress = {
-                            isPressed = true
-                            tryAwaitRelease()
-                            isPressed = false
-                        },
+                        onPress = { isPressed = true; tryAwaitRelease(); isPressed = false },
                         onTap = { onClick() }
                     )
                 }
@@ -120,12 +128,12 @@ fun GrindButton(
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text = text.uppercase(),
+            text = text,
             style = TextStyle(
                 fontFamily = FontFamily.SansSerif,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = FontWeight.Bold,
                 fontSize = 15.sp,
-                color = SpaceBlack
+                color = if (enabled) Color.Black else TextMuted
             )
         )
     }

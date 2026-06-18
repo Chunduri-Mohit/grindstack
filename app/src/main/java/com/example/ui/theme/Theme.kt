@@ -6,19 +6,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 private val GrindStackColorScheme = darkColorScheme(
-    primary = AccentOrange,
-    secondary = AccentGreen,
-    tertiary = AccentPurple,
-    background = SpaceBlack,
-    surface = SpaceBlack,
-    onPrimary = SpaceBlack,
-    onSecondary = SpaceBlack,
-    onTertiary = TextPrimary,
+    primary = Primary,
+    secondary = Secondary,
+    tertiary = Tertiary,
+    background = Background,
+    surface = Surface,
+    onPrimary = Color.Black,
+    onSecondary = Color.Black,
+    onTertiary = Color.Black,
     onBackground = TextPrimary,
     onSurface = TextPrimary,
-    surfaceVariant = CardBg,
+    surfaceVariant = SurfaceContainer,
     onSurfaceVariant = TextSecondary,
-    outline = CardBorder
+    outline = Outline
 )
 
 @Composable

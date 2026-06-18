@@ -28,7 +28,8 @@ data class Task(
     val isCompleted: Boolean = false,
     val isCustom: Boolean = false,
     val streak: Int = 0,
-    val lastCompletedDate: String? = null
+    val lastCompletedDate: String? = null,
+    val sortOrder: Int = 0
 )
 
 @Entity(tableName = "tech_logs")

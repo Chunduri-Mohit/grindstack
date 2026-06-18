@@ -22,11 +22,14 @@ interface UserProfileDao {
 
 @Dao
 interface TaskDao {
-    @Query("SELECT * FROM tasks ORDER BY id ASC")
+    @Query("SELECT * FROM tasks ORDER BY sortOrder ASC, id ASC")
     fun getAllTasks(): Flow<List<Task>>
 
-    @Query("SELECT * FROM tasks ORDER BY id ASC")
+    @Query("SELECT * FROM tasks ORDER BY sortOrder ASC, id ASC")
     suspend fun getTasksList(): List<Task>
+
+    @Query("SELECT COALESCE(MAX(sortOrder), -1) FROM tasks")
+    suspend fun getMaxSortOrder(): Int
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTask(task: Task)
